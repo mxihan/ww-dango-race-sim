@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Mapping, Protocol
 
 
@@ -19,6 +20,9 @@ class TileEffect(Protocol):
 class Board:
     finish: int
     tiles: Mapping[int, TileEffect] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "tiles", MappingProxyType(dict(self.tiles)))
 
 
 @dataclass
@@ -114,5 +118,8 @@ class RaceState:
 @dataclass(frozen=True)
 class RaceResult:
     winner_id: str
-    rankings: list[str]
+    rankings: tuple[str, ...]
     rounds: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "rankings", tuple(self.rankings))
