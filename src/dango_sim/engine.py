@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -20,8 +21,9 @@ class RaceEngine:
         config.validate()
         self.config = config
         self.rng = rng or random.Random()
+        self.participants = deepcopy(config.participants)
         self.dangos: dict[str, Dango] = {
-            dango.id: dango for dango in config.participants
+            dango.id: dango for dango in self.participants
         }
         self.state = RaceState.initial(self.normal_ids())
 
@@ -52,7 +54,7 @@ class RaceEngine:
 
     def normal_ids(self) -> list[str]:
         return [
-            dango.id for dango in self.config.participants if not dango.is_special
+            dango.id for dango in self.participants if not dango.is_special
         ]
 
     def roll_round_values(self, order: Iterable[str]) -> dict[str, int]:

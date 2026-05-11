@@ -95,6 +95,21 @@ def test_morning_cycles_rolls_three_two_one():
     assert [skill.roll(dango, state, FixedRng()) for _ in range(4)] == [3, 2, 1, 3]
 
 
+def test_morning_skill_state_is_local_to_each_engine():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="m", name="Morning", skill=MorningSkill())],
+        include_bu_king=False,
+    )
+
+    first_engine = RaceEngine(config, rng=FixedRng())
+    second_engine = RaceEngine(config, rng=FixedRng())
+
+    assert first_engine.roll_for("m") == 3
+    assert second_engine.roll_for("m") == 3
+    assert config.participants[0].skill.index == 0
+
+
 def test_shorekeeper_faces_are_two_and_three():
     assert ShorekeeperSkill().roll_faces(
         Dango(id="s", name="Shorekeeper"),
@@ -152,3 +167,40 @@ def test_aimis_ignores_bu_king_only_stack_when_teleporting():
 
     assert engine.state.stack_at(6) == [BU_KING_ID]
     assert engine.state.stack_at(8) == ["target", "aimis"]
+
+
+def test_aimis_skill_state_is_local_to_each_engine():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[
+            Dango(id="aimis", name="Aimis", skill=AimisSkill()),
+            Dango(id="target", name="Target"),
+        ],
+        include_bu_king=False,
+    )
+
+    first_engine = RaceEngine(config, rng=FixedRng())
+    first_engine.state = RaceState(positions={5: ["aimis"], 7: ["target"]})
+    first_context = TurnContext(round_rolls={"aimis": 3}, base_roll=3, movement=3)
+    first_engine.dangos["aimis"].skill.after_move(
+        first_engine.dangos["aimis"],
+        first_engine.state,
+        first_context,
+        FixedRng(),
+        first_engine,
+    )
+
+    second_engine = RaceEngine(config, rng=FixedRng())
+    second_engine.state = RaceState(positions={5: ["aimis"], 7: ["target"]})
+    second_context = TurnContext(round_rolls={"aimis": 3}, base_roll=3, movement=3)
+    second_engine.dangos["aimis"].skill.after_move(
+        second_engine.dangos["aimis"],
+        second_engine.state,
+        second_context,
+        FixedRng(),
+        second_engine,
+    )
+
+    assert first_engine.state.stack_at(7) == ["target", "aimis"]
+    assert second_engine.state.stack_at(7) == ["target", "aimis"]
+    assert config.participants[0].skill.used is False

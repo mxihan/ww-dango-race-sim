@@ -125,7 +125,8 @@ def test_round_rolls_are_materialized_before_first_turn():
 
     engine.run()
 
-    assert skill.observed_rolls == [[1, 2, 3]]
+    assert engine.dangos["a"].skill.observed_rolls == [[1, 2, 3]]
+    assert skill.observed_rolls == []
 
 
 def test_engine_resolves_tile_chaining():
