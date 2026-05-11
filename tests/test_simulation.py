@@ -93,3 +93,75 @@ def test_run_simulations_calls_config_factory_once_per_run():
 def test_run_simulations_rejects_non_positive_runs():
     with pytest.raises(ValueError, match="positive"):
         run_simulations(config_factory=lambda: RaceConfig(Board(1), []), runs=0)
+
+
+def test_run_simulations_uses_deterministic_per_run_rngs():
+    class RngRecordingEngine:
+        values = []
+
+        def __init__(self, config, rng):
+            self.config = config
+            self.rng = rng
+
+        def run(self):
+            value = self.rng.randrange(1000)
+            self.values.append(value)
+            return RaceResult(winner_id="a", rankings=["a"], rounds=value)
+
+    def run_once():
+        RngRecordingEngine.values = []
+        summary = run_simulations(
+            config_factory=lambda: RaceConfig(
+                board=Board(finish=10),
+                participants=[Dango(id="a", name="A")],
+                include_bu_king=False,
+            ),
+            runs=3,
+            seed=11,
+            engine_cls=RngRecordingEngine,
+        )
+        return list(RngRecordingEngine.values), summary
+
+    first_values, first_summary = run_once()
+    second_values, second_summary = run_once()
+
+    assert first_values == second_values
+    assert first_summary == second_summary
+
+
+def test_simulation_summary_mappings_are_immutable():
+    summary = SimulationSummary(
+        runs=1,
+        wins={"a": 1},
+        win_rates={"a": 1.0},
+        average_rank={"a": 1.0},
+        average_rounds=1.0,
+    )
+
+    with pytest.raises(TypeError):
+        summary.wins["b"] = 1
+    with pytest.raises(TypeError):
+        summary.win_rates["a"] = 0.5
+    with pytest.raises(TypeError):
+        summary.average_rank["a"] = 2.0
+
+
+def test_run_simulations_summary_cannot_be_mutated_through_source_mappings():
+    wins = {"a": 1}
+    win_rates = {"a": 1.0}
+    average_rank = {"a": 1.0}
+
+    summary = SimulationSummary(
+        runs=1,
+        wins=wins,
+        win_rates=win_rates,
+        average_rank=average_rank,
+        average_rounds=1.0,
+    )
+    wins["b"] = 2
+    win_rates["a"] = 0.0
+    average_rank["a"] = 3.0
+
+    assert dict(summary.wins) == {"a": 1}
+    assert dict(summary.win_rates) == {"a": 1.0}
+    assert dict(summary.average_rank) == {"a": 1.0}

@@ -20,6 +20,13 @@ from dango_sim.skills import (
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
 
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be positive")
+    return parsed
+
+
 def build_sample_config() -> RaceConfig:
     return RaceConfig(
         board=Board(
@@ -47,7 +54,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run dango race simulations.")
     parser.add_argument(
         "--runs",
-        type=int,
+        type=positive_int,
         default=1000,
         help="number of simulations to run",
     )

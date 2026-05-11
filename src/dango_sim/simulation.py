@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Callable
+from types import MappingProxyType
+from typing import Callable, Mapping
 
 from dango_sim.engine import RaceEngine
 from dango_sim.models import RaceConfig
@@ -11,10 +12,23 @@ from dango_sim.models import RaceConfig
 @dataclass(frozen=True)
 class SimulationSummary:
     runs: int
-    wins: dict[str, int]
-    win_rates: dict[str, float]
-    average_rank: dict[str, float]
+    wins: Mapping[str, int]
+    win_rates: Mapping[str, float]
+    average_rank: Mapping[str, float]
     average_rounds: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "wins", MappingProxyType(dict(self.wins)))
+        object.__setattr__(
+            self,
+            "win_rates",
+            MappingProxyType(dict(self.win_rates)),
+        )
+        object.__setattr__(
+            self,
+            "average_rank",
+            MappingProxyType(dict(self.average_rank)),
+        )
 
 
 def run_simulations(
