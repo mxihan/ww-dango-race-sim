@@ -204,8 +204,43 @@ def test_bu_king_contacts_stack_and_carries_it_backward_from_bottom():
 
     engine.take_bu_king_turn()
 
+    assert engine.state.stack_at(7) == [BU_KING_ID, "a", "b"]
+
+
+def test_bu_king_collects_every_stack_crossed_in_encounter_order():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[
+            Dango(id="a", name="A"),
+            Dango(id="b", name="B"),
+            Dango(id="c", name="C"),
+        ],
+    )
+    engine = RaceEngine(config, rng=FixedRng([6]))
+    engine.state = RaceState(
+        positions={10: [BU_KING_ID], 8: ["a"], 5: ["b", "c"]},
+        round_number=3,
+    )
+
+    engine.take_bu_king_turn()
+
+    assert engine.state.stack_at(8) == []
+    assert engine.state.stack_at(5) == []
+    assert engine.state.stack_at(4) == [BU_KING_ID, "a", "b", "c"]
+
+
+def test_bu_king_resolves_tiles_after_collecting_crossed_stacks():
+    config = RaceConfig(
+        board=Board(finish=10, tiles={7: Booster()}),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+    )
+    engine = RaceEngine(config, rng=FixedRng([3]))
+    engine.state = RaceState(positions={10: [BU_KING_ID], 7: ["a", "b"]}, round_number=3)
+
+    engine.take_bu_king_turn()
+
     assert engine.state.stack_at(7) == []
-    assert engine.state.stack_at(4) == [BU_KING_ID, "a", "b"]
+    assert engine.state.stack_at(8) == [BU_KING_ID, "a", "b"]
 
 
 def test_bu_king_teleports_to_finish_when_separated_from_last_place():

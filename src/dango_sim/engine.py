@@ -139,25 +139,27 @@ class RaceEngine:
         source = self.state.position_of(BU_KING_ID)
         target = source - roll
         normal_ids = set(self.normal_ids())
-        contacted_positions = [
-            position
-            for position, stack in self.state.positions.items()
-            if target <= position < source
-            and any(dango_id in normal_ids for dango_id in stack)
-        ]
+        contacted_positions = sorted(
+            [
+                position
+                for position, stack in self.state.positions.items()
+                if target <= position < source
+                and any(dango_id in normal_ids for dango_id in stack)
+            ],
+            reverse=True,
+        )
 
-        bu_group = self.state.lift_group_from(BU_KING_ID)
-        if not contacted_positions:
-            self.move_group_to(bu_group, target)
-            return
+        carried_group = self.state.lift_group_from(BU_KING_ID)
+        for position in contacted_positions:
+            carried_group.extend(
+                dango_id
+                for dango_id in self.state.stack_at(position)
+                if dango_id in normal_ids
+            )
 
-        contact = max(contacted_positions)
-        contacted_stack = self.state.stack_at(contact)
-        self.state.remove_ids(contacted_stack)
-        carried_group = bu_group + contacted_stack
-        destination = contact - roll
-        self.state.place_group(carried_group, destination)
-        self.resolve_tiles(carried_group, destination)
+        self.state.remove_ids(carried_group)
+        self.state.place_group(carried_group, target)
+        self.resolve_tiles(carried_group, target)
 
     def end_round(self) -> None:
         if not self.config.include_bu_king:
