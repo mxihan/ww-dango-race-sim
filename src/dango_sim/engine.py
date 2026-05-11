@@ -38,17 +38,24 @@ class RaceEngine:
         for round_number in range(1, self.config.max_rounds + 1):
             self.state.round_number = round_number
             order = self.normal_ids()
+            if self.config.include_bu_king:
+                order.append(BU_KING_ID)
             self.rng.shuffle(order)
-            round_rolls = self.roll_round_values(order)
+            round_rolls = self.roll_round_values(
+                dango_id for dango_id in order if dango_id != BU_KING_ID
+            )
 
             for dango_id in order:
                 if self.has_finished():
                     break
-                self.take_turn(
-                    dango_id,
-                    base_roll=round_rolls[dango_id],
-                    round_rolls=round_rolls,
-                )
+                if dango_id == BU_KING_ID:
+                    self.take_bu_king_turn()
+                else:
+                    self.take_turn(
+                        dango_id,
+                        base_roll=round_rolls[dango_id],
+                        round_rolls=round_rolls,
+                    )
                 if self.has_finished():
                     rankings = self.rankings()
                     return RaceResult(
@@ -58,14 +65,6 @@ class RaceEngine:
                     )
 
             if not self.has_finished():
-                self.take_bu_king_turn()
-                if self.has_finished():
-                    rankings = self.rankings()
-                    return RaceResult(
-                        winner_id=rankings[0],
-                        rankings=rankings,
-                        rounds=round_number,
-                    )
                 self.end_round()
 
         raise RuntimeError("race did not finish within max_rounds")

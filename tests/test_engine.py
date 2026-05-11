@@ -41,22 +41,6 @@ def test_normal_dango_reaching_finish_ends_race_immediately():
     assert result.rounds == 1
 
 
-def test_finish_is_not_undone_by_finish_tile_effect():
-    config = RaceConfig(
-        board=Board(finish=10, tiles={10: Inhibitor()}),
-        participants=[Dango(id="a", name="A")],
-        include_bu_king=False,
-    )
-    engine = RaceEngine(config, rng=FixedRng([1]))
-    engine.state = RaceState(positions={9: ["a"]})
-
-    result = engine.run()
-
-    assert result.winner_id == "a"
-    assert tuple(result.rankings) == ("a",)
-    assert engine.state.stack_at(10) == ["a"]
-
-
 def test_lower_dango_carries_dango_above_it():
     config = RaceConfig(
         board=Board(finish=10),
@@ -318,3 +302,71 @@ def test_bu_king_stays_when_on_last_place_stack():
     engine.end_round()
 
     assert engine.state.stack_at(2) == [BU_KING_ID, "a"]
+
+
+class OrderRecordingRng:
+    """RNG that records what lists were passed to shuffle."""
+
+    def __init__(self, choices):
+        self.choices = list(choices)
+        self.shuffled_orders: list[list[str]] = []
+
+    def shuffle(self, values):
+        self.shuffled_orders.append(list(values))
+
+    def choice(self, values):
+        return self.choices.pop(0)
+
+    def random(self):
+        return 0.5
+
+
+def test_bu_king_included_in_shuffled_turn_order():
+    """Bu King participates in the random turn order each round."""
+    config = RaceConfig(
+        board=Board(finish=3),
+        participants=[Dango(id="a", name="A")],
+    )
+    rng = OrderRecordingRng([3])
+    engine = RaceEngine(config, rng=rng)
+
+    engine.run()
+
+    assert len(rng.shuffled_orders) >= 1
+    for order in rng.shuffled_orders:
+        assert "a" in order
+        assert BU_KING_ID in order
+
+
+def test_bu_king_absent_from_turn_order_when_excluded():
+    """Bu King is not in the turn order when include_bu_king=False."""
+    config = RaceConfig(
+        board=Board(finish=3),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    rng = OrderRecordingRng([3])
+    engine = RaceEngine(config, rng=rng)
+
+    engine.run()
+
+    for order in rng.shuffled_orders:
+        assert "a" in order
+        assert BU_KING_ID not in order
+
+
+def test_race_completes_with_bu_king_in_shuffled_order():
+    """Full race with Bu King in shuffled order produces valid results."""
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+    )
+    rolls = [3, 1, 3, 3, 1, 3, 3, 1, 3, 3, 1, 3]
+    rng = OrderRecordingRng(rolls)
+    engine = RaceEngine(config, rng=rng)
+
+    result = engine.run()
+
+    assert result.winner_id in ("a", "b")
+    assert len(result.rankings) == 2
+    assert BU_KING_ID not in result.rankings

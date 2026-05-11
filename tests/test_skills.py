@@ -5,7 +5,7 @@ from dango_sim.skills import (
     CorletaSkill,
     LinnaeSkill,
     MorningSkill,
-    QianlianSkill,
+    ChisaSkill,
     ShorekeeperSkill,
 )
 
@@ -40,12 +40,12 @@ def test_corleta_doubles_roll_when_probability_triggers():
     assert movement == 4
 
 
-def test_qianlian_adds_two_when_roll_is_round_minimum():
-    skill = QianlianSkill()
+def test_chisa_adds_two_when_roll_is_round_minimum():
+    skill = ChisaSkill()
     context = TurnContext(round_rolls={"q": 1, "a": 1, "b": 3}, base_roll=1, movement=1)
 
     movement = skill.modify_roll(
-        Dango(id="q", name="Qianlian"),
+        Dango(id="q", name="Chisa"),
         1,
         RaceState.initial(["q"]),
         context,
@@ -58,7 +58,7 @@ def test_qianlian_adds_two_when_roll_is_round_minimum():
 def test_linnae_blocked_state_wins_over_double_move():
     skill = LinnaeSkill()
     context = TurnContext(round_rolls={"l": 2}, base_roll=2, movement=2)
-    rng = FixedRng(randoms=[0.10, 0.10])
+    rng = FixedRng(randoms=[0.10])
 
     skill.before_move(
         Dango(id="l", name="Linnae"),
@@ -80,11 +80,26 @@ def test_linnae_can_double_when_not_blocked():
         Dango(id="l", name="Linnae"),
         RaceState.initial(["l"]),
         context,
-        FixedRng(randoms=[0.80, 0.50]),
+        FixedRng(randoms=[0.50]),
     )
 
     assert context.blocked is False
     assert context.movement == 4
+
+
+def test_linnae_moves_normally_when_neither_triggered():
+    skill = LinnaeSkill()
+    context = TurnContext(round_rolls={"l": 2}, base_roll=2, movement=2)
+
+    skill.before_move(
+        Dango(id="l", name="Linnae"),
+        RaceState.initial(["l"]),
+        context,
+        FixedRng(randoms=[0.90]),
+    )
+
+    assert context.blocked is False
+    assert context.movement == 2
 
 
 def test_morning_cycles_rolls_three_two_one():

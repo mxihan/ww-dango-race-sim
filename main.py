@@ -14,7 +14,7 @@ from dango_sim.skills import (
     CorletaSkill,
     LinnaeSkill,
     MorningSkill,
-    QianlianSkill,
+    ChisaSkill,
     ShorekeeperSkill,
 )
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
@@ -28,20 +28,27 @@ def positive_int(value: str) -> int:
 
 
 def build_sample_config() -> RaceConfig:
+    # Board layout (32 tiles, start/finish share position 0):
+    #   0 = start = finish
+    #   1..31 = track tiles (1 = first tile ahead of start)
+    #   finish = 32 means dangos travel 32 tiles to complete a lap
     return RaceConfig(
         board=Board(
-            finish=30,
+            finish=32,
             tiles={
-                4: Booster(),
-                8: Inhibitor(),
-                13: SpaceTimeRift(),
-                19: Booster(),
-                24: Inhibitor(),
+                3: Booster(),
+                6: SpaceTimeRift(),
+                10: Inhibitor(),
+                11: Booster(),
+                16: Booster(),
+                20: SpaceTimeRift(),
+                23: Booster(),
+                28: Inhibitor(),
             },
         ),
         participants=[
             Dango(id="corleta", name="珂莱塔团子", skill=CorletaSkill()),
-            Dango(id="qianlian", name="千联团子", skill=QianlianSkill()),
+            Dango(id="chisa", name="千咲团子", skill=ChisaSkill()),
             Dango(id="linnae", name="琳奈团子", skill=LinnaeSkill()),
             Dango(id="morning", name="莫宁团子", skill=MorningSkill()),
             Dango(id="aimis", name="爱弥斯团子", skill=AimisSkill()),

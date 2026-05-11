@@ -14,7 +14,7 @@ class CorletaSkill:
 
 
 @dataclass
-class QianlianSkill:
+class ChisaSkill:
     bonus: int = 2
 
     def modify_roll(self, dango: Dango, roll: int, state: RaceState, context, rng) -> int:
@@ -27,12 +27,10 @@ class LinnaeSkill:
     double_chance: float = 0.60
 
     def before_move(self, dango: Dango, state: RaceState, context, rng) -> None:
-        blocked = rng.random() < self.blocked_chance
-        doubled = rng.random() < self.double_chance
-        if blocked:
+        r = rng.random()
+        if r < self.blocked_chance:
             context.blocked = True
-            return
-        if doubled:
+        elif r < self.blocked_chance + self.double_chance:
             context.movement *= 2
 
 

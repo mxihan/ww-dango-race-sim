@@ -725,7 +725,7 @@ Create `tests/test_skills.py`:
 ```python
 from dango_sim.engine import RaceEngine, TurnContext
 from dango_sim.models import Board, Dango, RaceConfig, RaceState
-from dango_sim.skills import AimisSkill, CorletaSkill, LinnaeSkill, MorningSkill, QianlianSkill, ShorekeeperSkill
+from dango_sim.skills import AimisSkill, CorletaSkill, LinnaeSkill, MorningSkill, ChisaSkill, ShorekeeperSkill
 
 
 class FixedRng:
@@ -752,11 +752,11 @@ def test_corleta_doubles_roll_when_probability_triggers():
     assert movement == 4
 
 
-def test_qianlian_adds_two_when_roll_is_round_minimum():
-    skill = QianlianSkill()
+def test_chisa_adds_two_when_roll_is_round_minimum():
+    skill = ChisaSkill()
     context = TurnContext(round_rolls={"q": 1, "a": 1, "b": 3}, base_roll=1, movement=1)
 
-    movement = skill.modify_roll(Dango(id="q", name="Qianlian"), 1, RaceState.initial(["q"]), context, FixedRng())
+    movement = skill.modify_roll(Dango(id="q", name="Chisa"), 1, RaceState.initial(["q"]), context, FixedRng())
 
     assert movement == 3
 
@@ -839,7 +839,7 @@ class CorletaSkill:
 
 
 @dataclass
-class QianlianSkill:
+class ChisaSkill:
     bonus: int = 2
 
     def modify_roll(self, dango: Dango, roll: int, state: RaceState, context, rng) -> int:
@@ -1222,7 +1222,7 @@ import argparse
 
 from dango_sim.models import Board, Dango, RaceConfig
 from dango_sim.simulation import run_simulations
-from dango_sim.skills import AimisSkill, CorletaSkill, LinnaeSkill, MorningSkill, QianlianSkill, ShorekeeperSkill
+from dango_sim.skills import AimisSkill, CorletaSkill, LinnaeSkill, MorningSkill, ChisaSkill, ShorekeeperSkill
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
 
@@ -1240,7 +1240,7 @@ def build_sample_config() -> RaceConfig:
         ),
         participants=[
             Dango(id="corleta", name="珂莱塔团子", skill=CorletaSkill()),
-            Dango(id="qianlian", name="千联团子", skill=QianlianSkill()),
+            Dango(id="chisa", name="千咲团子", skill=ChisaSkill()),
             Dango(id="linnae", name="琳奈团子", skill=LinnaeSkill()),
             Dango(id="morning", name="莫宁团子", skill=MorningSkill()),
             Dango(id="aimis", name="爱弥斯团子", skill=AimisSkill()),

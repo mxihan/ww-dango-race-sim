@@ -72,13 +72,23 @@ def test_config_validation_rejects_duplicate_normal_dango_ids():
         config.validate()
 
 
-def test_config_validation_rejects_tile_outside_board():
+def test_config_validation_rejects_tile_at_or_past_finish():
     config = RaceConfig(
-        board=Board(finish=10, tiles={11: object()}),
+        board=Board(finish=10, tiles={10: object()}),
         participants=[Dango(id="a", name="A")],
     )
 
-    with pytest.raises(ValueError, match="within"):
+    with pytest.raises(ValueError, match="1"):
+        config.validate()
+
+
+def test_config_validation_rejects_tile_at_start():
+    config = RaceConfig(
+        board=Board(finish=10, tiles={0: object()}),
+        participants=[Dango(id="a", name="A")],
+    )
+
+    with pytest.raises(ValueError, match="1"):
         config.validate()
 
 

@@ -52,8 +52,8 @@ class RaceConfig:
         if any(dango.id == BU_KING_ID for dango in self.participants):
             raise ValueError("Bu King is managed by the engine and must not be provided")
         for position in self.board.tiles:
-            if position < 0 or position > self.board.finish:
-                raise ValueError("tile positions must be within 0..finish")
+            if not (0 < position < self.board.finish):
+                raise ValueError("tile positions must be within 1..(finish-1)")
         if self.max_rounds <= 0:
             raise ValueError("max_rounds must be positive")
         if self.max_tile_depth <= 0:
