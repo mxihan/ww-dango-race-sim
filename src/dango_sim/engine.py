@@ -126,6 +126,8 @@ class RaceEngine:
             self.state.place_group(group, next_position)
             current = next_position
 
+        if self.config.board.tiles.get(current) is None:
+            return
         raise RuntimeError("tile resolution exceeded maximum depth")
 
     def has_finished(self) -> bool:

@@ -141,6 +141,20 @@ def test_engine_resolves_tile_chaining():
     assert engine.state.stack_at(4) == ["a"]
 
 
+def test_engine_allows_tile_chain_to_end_at_max_depth():
+    config = RaceConfig(
+        board=Board(finish=10, tiles={2: Booster(), 3: Booster()}),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+        max_tile_depth=2,
+    )
+    engine = RaceEngine(config, rng=FixedRng([2]))
+
+    engine.take_turn("a")
+
+    assert engine.state.stack_at(4) == ["a"]
+
+
 def test_engine_stops_infinite_tile_loop():
     config = RaceConfig(
         board=Board(finish=10, tiles={2: Booster(), 3: Inhibitor()}),
