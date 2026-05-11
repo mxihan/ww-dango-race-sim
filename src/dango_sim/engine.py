@@ -121,6 +121,9 @@ class RaceEngine:
         source = self.state.position_of(dango_id)
         group = self.state.lift_group_from(dango_id)
         destination = source + context.movement
+        if destination >= self.config.board.finish:
+            self.state.place_group(group, destination)
+            return
         self.move_group_to(group, destination)
 
         if dango.skill and hasattr(dango.skill, "after_move"):
@@ -169,7 +172,7 @@ class RaceEngine:
             self.state.position_of(dango_id) for dango_id in self.normal_ids()
         ]
         last_place = min(normal_positions)
-        if self.state.position_of(BU_KING_ID) == last_place:
+        if self.state.position_of(BU_KING_ID) >= last_place:
             return
 
         self.state.remove_ids([BU_KING_ID])

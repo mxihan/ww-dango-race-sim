@@ -76,6 +76,10 @@ class AimisSkill:
             return
 
         target = min(candidates)
-        group = state.lift_group_from(dango.id)
-        state.place_group(group, target)
+        source = state.position_of(dango.id)
+        source_stack = state.positions[source]
+        source_stack.remove(dango.id)
+        if not source_stack:
+            del state.positions[source]
+        state.place_group([dango.id], target)
         self.used = True

@@ -142,6 +142,33 @@ def test_aimis_teleports_once_to_nearest_dango_ahead():
     assert engine.state.stack_at(7) == ["near", "aimis"]
 
 
+def test_aimis_teleports_only_itself_not_dango_above_it():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[
+            Dango(id="lower", name="Lower"),
+            Dango(id="aimis", name="Aimis", skill=AimisSkill()),
+            Dango(id="rider", name="Rider"),
+            Dango(id="target", name="Target"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={5: ["lower", "aimis", "rider"], 7: ["target"]})
+    context = TurnContext(round_rolls={"aimis": 3}, base_roll=3, movement=3)
+
+    engine.dangos["aimis"].skill.after_move(
+        engine.dangos["aimis"],
+        engine.state,
+        context,
+        FixedRng(),
+        engine,
+    )
+
+    assert engine.state.stack_at(5) == ["lower", "rider"]
+    assert engine.state.stack_at(7) == ["target", "aimis"]
+
+
 def test_aimis_ignores_bu_king_only_stack_when_teleporting():
     config = RaceConfig(
         board=Board(finish=10),

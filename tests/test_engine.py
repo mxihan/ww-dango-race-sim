@@ -41,6 +41,22 @@ def test_normal_dango_reaching_finish_ends_race_immediately():
     assert result.rounds == 1
 
 
+def test_finish_is_not_undone_by_finish_tile_effect():
+    config = RaceConfig(
+        board=Board(finish=10, tiles={10: Inhibitor()}),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([1]))
+    engine.state = RaceState(positions={9: ["a"]})
+
+    result = engine.run()
+
+    assert result.winner_id == "a"
+    assert tuple(result.rankings) == ("a",)
+    assert engine.state.stack_at(10) == ["a"]
+
+
 def test_lower_dango_carries_dango_above_it():
     config = RaceConfig(
         board=Board(finish=10),
@@ -251,6 +267,38 @@ def test_bu_king_teleports_to_finish_when_separated_from_last_place():
     engine = RaceEngine(config, rng=FixedRng([]))
     engine.state = RaceState(
         positions={10: [BU_KING_ID], 2: ["a"], 6: ["b"]},
+        round_number=3,
+    )
+
+    engine.end_round()
+
+    assert engine.state.stack_at(10) == [BU_KING_ID]
+
+
+def test_bu_king_stays_when_it_can_still_reach_last_place():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+    )
+    engine = RaceEngine(config, rng=FixedRng([]))
+    engine.state = RaceState(
+        positions={5: [BU_KING_ID], 2: ["a"], 6: ["b"]},
+        round_number=3,
+    )
+
+    engine.end_round()
+
+    assert engine.state.stack_at(5) == [BU_KING_ID]
+
+
+def test_bu_king_teleports_after_passing_last_place_toward_start():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+    )
+    engine = RaceEngine(config, rng=FixedRng([]))
+    engine.state = RaceState(
+        positions={1: [BU_KING_ID], 2: ["a"], 6: ["b"]},
         round_number=3,
     )
 
