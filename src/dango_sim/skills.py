@@ -27,10 +27,12 @@ class LinnaeSkill:
     double_chance: float = 0.60
 
     def before_move(self, dango: Dango, state: RaceState, context, rng) -> None:
-        if rng.random() < self.blocked_chance:
+        blocked = rng.random() < self.blocked_chance
+        doubled = rng.random() < self.double_chance
+        if blocked:
             context.blocked = True
             return
-        if rng.random() < self.double_chance:
+        if doubled:
             context.movement *= 2
 
 

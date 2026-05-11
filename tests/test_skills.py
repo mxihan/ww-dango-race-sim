@@ -58,16 +58,18 @@ def test_qianlian_adds_two_when_roll_is_round_minimum():
 def test_linnae_blocked_state_wins_over_double_move():
     skill = LinnaeSkill()
     context = TurnContext(round_rolls={"l": 2}, base_roll=2, movement=2)
+    rng = FixedRng(randoms=[0.10, 0.10])
 
     skill.before_move(
         Dango(id="l", name="Linnae"),
         RaceState.initial(["l"]),
         context,
-        FixedRng(randoms=[0.10, 0.10]),
+        rng,
     )
 
     assert context.blocked is True
     assert context.movement == 2
+    assert rng.randoms == []
 
 
 def test_linnae_can_double_when_not_blocked():
