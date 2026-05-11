@@ -12,7 +12,7 @@ Pytest test suite covering the dango_sim library — models, engine, skills, til
 |------|-------------|
 | `test_models.py` | Tests for `Board`, `Dango`, `RaceConfig` validation, `RaceState` mutations (lift, place, remove, stack operations) |
 | `test_engine.py` | Integration tests for `RaceEngine` — full race runs, turn resolution, Bu King behavior, tile chaining, rankings |
-| `test_skills.py` | Unit tests for each skill: `CorletaSkill` (double roll), `ChisaSkill` (min-roll bonus), `LinnaeSkill` (block/double), `MorningSkill` (fixed sequence), `ShorekeeperSkill` (custom faces), `AimisSkill` (teleport) |
+| `test_skills.py` | Unit tests for each skill: `CarlottaSkill` (double roll), `ChisaSkill` (min-roll bonus), `LynaeSkill` (block/double), `MornyeSkill` (fixed sequence), `ShorekeeperSkill` (custom faces), `AemeathSkill` (teleport) |
 | `test_tiles.py` | Tests for `Booster`, `Inhibitor`, `SpaceTimeRift` tile effects |
 | `test_simulation.py` | Tests for `run_simulations()` and `SimulationSummary` — statistical accuracy, seed determinism, validation |
 

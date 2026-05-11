@@ -6,7 +6,7 @@ from dango_sim.models import BU_KING_ID, Dango, RaceState
 
 
 @dataclass
-class CorletaSkill:
+class CarlottaSkill:
     chance: float = 0.28
 
     def modify_roll(self, dango: Dango, roll: int, state: RaceState, context, rng) -> int:
@@ -22,7 +22,7 @@ class ChisaSkill:
 
 
 @dataclass
-class LinnaeSkill:
+class LynaeSkill:
     blocked_chance: float = 0.20
     double_chance: float = 0.60
 
@@ -35,7 +35,7 @@ class LinnaeSkill:
 
 
 @dataclass
-class MorningSkill:
+class MornyeSkill:
     sequence: tuple[int, ...] = (3, 2, 1)
     index: int = 0
 
@@ -52,9 +52,9 @@ class ShorekeeperSkill:
 
 
 @dataclass
-class AimisSkill:
+class AemeathSkill:
     used: bool = False
-    consume_on_fail: bool = False
+    consume_on_fail: bool = True
 
     def after_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
         if self.used:

@@ -10,10 +10,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 from dango_sim.models import Board, Dango, RaceConfig
 from dango_sim.simulation import run_simulations
 from dango_sim.skills import (
-    AimisSkill,
-    CorletaSkill,
-    LinnaeSkill,
-    MorningSkill,
+    AemeathSkill,
+    CarlottaSkill,
+    LynaeSkill,
+    MornyeSkill,
     ChisaSkill,
     ShorekeeperSkill,
 )
@@ -47,11 +47,11 @@ def build_sample_config() -> RaceConfig:
             },
         ),
         participants=[
-            Dango(id="corleta", name="珂莱塔团子", skill=CorletaSkill()),
+            Dango(id="carlotta", name="珂莱塔团子", skill=CarlottaSkill()),
             Dango(id="chisa", name="千咲团子", skill=ChisaSkill()),
-            Dango(id="linnae", name="琳奈团子", skill=LinnaeSkill()),
-            Dango(id="morning", name="莫宁团子", skill=MorningSkill()),
-            Dango(id="aimis", name="爱弥斯团子", skill=AimisSkill()),
+            Dango(id="lynae", name="琳奈团子", skill=LynaeSkill()),
+            Dango(id="mornye", name="莫宁团子", skill=MornyeSkill()),
+            Dango(id="aemeath", name="爱弥斯团子", skill=AemeathSkill()),
             Dango(id="shorekeeper", name="守岸人团子", skill=ShorekeeperSkill()),
         ],
     )

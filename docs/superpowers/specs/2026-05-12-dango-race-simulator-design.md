@@ -107,11 +107,11 @@ Skills use small hook methods so each dango can be tested independently:
 
 Initial skills:
 
-- Corleta: 28% chance to move by double the rolled points.
+- Carlotta: 28% chance to move by double the rolled points.
 - Chisa: if its rolled result is one of the lowest rolled values in the current round, move 2 extra spaces.
-- Linnae: each round has a 60% chance to move by double points, and a 20% chance to be unable to move. If both checks would apply, unable to move wins.
-- Morning: dice result cycles through `3, 2, 1`.
-- Aimis: once per race, after first reaching or passing the midpoint, if there is a non-Bu-King dango ahead, teleport to the top of the nearest such dango's stack.
+- Lynae: each round has a 60% chance to move by double points, and a 20% chance to be unable to move. If both checks would apply, unable to move wins.
+- Mornye: dice result cycles through `3, 2, 1`.
+- Aemeath: once per race, after first reaching or passing the midpoint, if there is a non-Bu-King dango ahead, teleport to the top of the nearest such dango's stack.
 - Shorekeeper: die only rolls `2` or `3`.
 
 ## Tile Rules
@@ -146,7 +146,7 @@ from dango_sim.simulation import run_simulations
 
 config = RaceConfig(
     board=Board(finish=30, tiles={5: Booster(), 9: Inhibitor()}),
-    participants=[corleta(), chisa(), shorekeeper()],
+    participants=[carlotta(), chisa(), shorekeeper()],
 )
 
 results = run_simulations(config_factory=lambda: config, runs=1000, seed=42)

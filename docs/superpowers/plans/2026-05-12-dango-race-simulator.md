@@ -725,7 +725,7 @@ Create `tests/test_skills.py`:
 ```python
 from dango_sim.engine import RaceEngine, TurnContext
 from dango_sim.models import Board, Dango, RaceConfig, RaceState
-from dango_sim.skills import AimisSkill, CorletaSkill, LinnaeSkill, MorningSkill, ChisaSkill, ShorekeeperSkill
+from dango_sim.skills import AemeathSkill, CarlottaSkill, LynaeSkill, MornyeSkill, ChisaSkill, ShorekeeperSkill
 
 
 class FixedRng:
@@ -743,11 +743,11 @@ class FixedRng:
         return self.randoms.pop(0)
 
 
-def test_corleta_doubles_roll_when_probability_triggers():
-    skill = CorletaSkill()
+def test_carlotta_doubles_roll_when_probability_triggers():
+    skill = CarlottaSkill()
     context = TurnContext(round_rolls={"c": 2}, base_roll=2, movement=2)
 
-    movement = skill.modify_roll(Dango(id="c", name="Corleta"), 2, RaceState.initial(["c"]), context, FixedRng(randoms=[0.27]))
+    movement = skill.modify_roll(Dango(id="c", name="Carlotta"), 2, RaceState.initial(["c"]), context, FixedRng(randoms=[0.27]))
 
     assert movement == 4
 
@@ -761,29 +761,29 @@ def test_chisa_adds_two_when_roll_is_round_minimum():
     assert movement == 3
 
 
-def test_linnae_blocked_state_wins_over_double_move():
-    skill = LinnaeSkill()
+def test_lynae_blocked_state_wins_over_double_move():
+    skill = LynaeSkill()
     context = TurnContext(round_rolls={"l": 2}, base_roll=2, movement=2)
 
-    skill.before_move(Dango(id="l", name="Linnae"), RaceState.initial(["l"]), context, FixedRng(randoms=[0.10, 0.10]))
+    skill.before_move(Dango(id="l", name="Lynae"), RaceState.initial(["l"]), context, FixedRng(randoms=[0.10, 0.10]))
 
     assert context.blocked is True
     assert context.movement == 2
 
 
-def test_linnae_can_double_when_not_blocked():
-    skill = LinnaeSkill()
+def test_lynae_can_double_when_not_blocked():
+    skill = LynaeSkill()
     context = TurnContext(round_rolls={"l": 2}, base_roll=2, movement=2)
 
-    skill.before_move(Dango(id="l", name="Linnae"), RaceState.initial(["l"]), context, FixedRng(randoms=[0.80, 0.50]))
+    skill.before_move(Dango(id="l", name="Lynae"), RaceState.initial(["l"]), context, FixedRng(randoms=[0.80, 0.50]))
 
     assert context.blocked is False
     assert context.movement == 4
 
 
-def test_morning_cycles_rolls_three_two_one():
-    skill = MorningSkill()
-    dango = Dango(id="m", name="Morning")
+def test_mornye_cycles_rolls_three_two_one():
+    skill = MornyeSkill()
+    dango = Dango(id="m", name="Mornye")
     state = RaceState.initial(["m"])
 
     assert [skill.roll(dango, state, FixedRng()) for _ in range(4)] == [3, 2, 1, 3]
@@ -793,23 +793,23 @@ def test_shorekeeper_faces_are_two_and_three():
     assert ShorekeeperSkill().roll_faces(Dango(id="s", name="Shorekeeper"), RaceState.initial(["s"])) == [2, 3]
 
 
-def test_aimis_teleports_once_to_nearest_dango_ahead():
+def test_aemeath_teleports_once_to_nearest_dango_ahead():
     config = RaceConfig(
         board=Board(finish=10),
         participants=[
-            Dango(id="aimis", name="Aimis", skill=AimisSkill()),
+            Dango(id="aemeath", name="Aemeath", skill=AemeathSkill()),
             Dango(id="near", name="Near"),
             Dango(id="far", name="Far"),
         ],
         include_bu_king=False,
     )
     engine = RaceEngine(config, rng=FixedRng())
-    engine.state = RaceState(positions={5: ["aimis"], 7: ["near"], 9: ["far"]})
-    context = TurnContext(round_rolls={"aimis": 3}, base_roll=3, movement=3)
+    engine.state = RaceState(positions={5: ["aemeath"], 7: ["near"], 9: ["far"]})
+    context = TurnContext(round_rolls={"aemeath": 3}, base_roll=3, movement=3)
 
     config.participants[0].skill.after_move(config.participants[0], engine.state, context, FixedRng(), engine)
 
-    assert engine.state.stack_at(7) == ["near", "aimis"]
+    assert engine.state.stack_at(7) == ["near", "aemeath"]
 ```
 
 - [ ] **Step 2: Run skill tests to verify they fail**
@@ -831,7 +831,7 @@ from dango_sim.models import BU_KING_ID, Dango, RaceState
 
 
 @dataclass
-class CorletaSkill:
+class CarlottaSkill:
     chance: float = 0.28
 
     def modify_roll(self, dango: Dango, roll: int, state: RaceState, context, rng) -> int:
@@ -847,7 +847,7 @@ class ChisaSkill:
 
 
 @dataclass
-class LinnaeSkill:
+class LynaeSkill:
     blocked_chance: float = 0.20
     double_chance: float = 0.60
 
@@ -860,7 +860,7 @@ class LinnaeSkill:
 
 
 @dataclass
-class MorningSkill:
+class MornyeSkill:
     sequence: tuple[int, ...] = (3, 2, 1)
     index: int = 0
 
@@ -877,7 +877,7 @@ class ShorekeeperSkill:
 
 
 @dataclass
-class AimisSkill:
+class AemeathSkill:
     used: bool = False
 
     def after_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
@@ -1222,7 +1222,7 @@ import argparse
 
 from dango_sim.models import Board, Dango, RaceConfig
 from dango_sim.simulation import run_simulations
-from dango_sim.skills import AimisSkill, CorletaSkill, LinnaeSkill, MorningSkill, ChisaSkill, ShorekeeperSkill
+from dango_sim.skills import AemeathSkill, CarlottaSkill, LynaeSkill, MornyeSkill, ChisaSkill, ShorekeeperSkill
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
 
@@ -1239,11 +1239,11 @@ def build_sample_config() -> RaceConfig:
             },
         ),
         participants=[
-            Dango(id="corleta", name="珂莱塔团子", skill=CorletaSkill()),
+            Dango(id="carlotta", name="珂莱塔团子", skill=CarlottaSkill()),
             Dango(id="chisa", name="千咲团子", skill=ChisaSkill()),
-            Dango(id="linnae", name="琳奈团子", skill=LinnaeSkill()),
-            Dango(id="morning", name="莫宁团子", skill=MorningSkill()),
-            Dango(id="aimis", name="爱弥斯团子", skill=AimisSkill()),
+            Dango(id="lynae", name="琳奈团子", skill=LynaeSkill()),
+            Dango(id="mornye", name="莫宁团子", skill=MornyeSkill()),
+            Dango(id="aemeath", name="爱弥斯团子", skill=AemeathSkill()),
             Dango(id="shorekeeper", name="守岸人团子", skill=ShorekeeperSkill()),
         ],
     )

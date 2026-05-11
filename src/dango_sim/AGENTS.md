@@ -14,7 +14,7 @@ Core simulation library for dango races. Provides domain models, a turn-based ra
 | `models.py` | Domain dataclasses — `Board`, `Dango`, `RaceConfig`, `RaceState`, `RaceResult`; `Skill` and `TileEffect` protocols; `BU_KING_ID` constant |
 | `engine.py` | `RaceEngine` — orchestrates a single race: rolling, turn resolution, Bu King turns, tile chaining, ranking |
 | `simulation.py` | `run_simulations()` Monte Carlo runner; `SimulationSummary` frozen dataclass with win rates, average rank, average rounds |
-| `skills.py` | Per-dango skill implementations: `CorletaSkill`, `ChisaSkill`, `LinnaeSkill`, `MorningSkill`, `ShorekeeperSkill`, `AimisSkill` |
+| `skills.py` | Per-dango skill implementations: `CarlottaSkill`, `ChisaSkill`, `LynaeSkill`, `MornyeSkill`, `ShorekeeperSkill`, `AemeathSkill` |
 | `tiles.py` | Tile effect implementations: `Booster` (forward), `Inhibitor` (backward), `SpaceTimeRift` (shuffle stack) |
 
 ## For AI Agents
