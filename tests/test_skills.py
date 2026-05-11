@@ -246,3 +246,49 @@ def test_aimis_skill_state_is_local_to_each_engine():
     assert first_engine.state.stack_at(7) == ["target", "aimis"]
     assert second_engine.state.stack_at(7) == ["target", "aimis"]
     assert config.participants[0].skill.used is False
+
+
+def test_aimis_preserves_skill_when_no_target_ahead():
+    """By default, Aimis keeps its skill if no valid target is found."""
+    skill = AimisSkill()
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="aimis", name="Aimis", skill=skill)],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={6: ["aimis"]})
+    context = TurnContext(round_rolls={"aimis": 1}, base_roll=1, movement=1)
+
+    skill.after_move(
+        engine.dangos["aimis"],
+        engine.state,
+        context,
+        FixedRng(),
+        engine,
+    )
+
+    assert skill.used is False
+
+
+def test_aimis_consumes_skill_on_fail_when_configured():
+    """With consume_on_fail=True, the skill is consumed even without a target."""
+    skill = AimisSkill(consume_on_fail=True)
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="aimis", name="Aimis", skill=skill)],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={6: ["aimis"]})
+    context = TurnContext(round_rolls={"aimis": 1}, base_roll=1, movement=1)
+
+    skill.after_move(
+        engine.dangos["aimis"],
+        engine.state,
+        context,
+        FixedRng(),
+        engine,
+    )
+
+    assert skill.used is True

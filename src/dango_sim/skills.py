@@ -54,6 +54,7 @@ class ShorekeeperSkill:
 @dataclass
 class AimisSkill:
     used: bool = False
+    consume_on_fail: bool = False
 
     def after_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
         if self.used:
@@ -71,6 +72,8 @@ class AimisSkill:
             if any(candidate_id != BU_KING_ID for candidate_id in stack):
                 candidates.append(candidate_position)
         if not candidates:
+            if self.consume_on_fail:
+                self.used = True
             return
 
         target = min(candidates)
