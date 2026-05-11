@@ -14,7 +14,8 @@ The core package exposes Python APIs for creating boards, dango definitions, ski
 
 In scope:
 
-- Single-lane board with positions from `0` to `finish`.
+- Single-lane loop board where position `0` is both start and finish.
+- `finish` is the number of steps required to complete one lap.
 - Custom board per race.
 - Custom participant list per race.
 - Dango stacking and stack movement.
@@ -37,10 +38,10 @@ Out of scope for the first version:
 
 `Board` represents a single-lane race track:
 
-- `finish`: finish position.
-- `tiles`: mapping from position to a `TileEffect`.
+- `finish`: number of steps required to complete one lap.
+- `tiles`: mapping from track position to a `TileEffect`; valid custom tile positions are `1..finish-1`.
 
-Forward always means increasing position from start to finish. Backward always means decreasing position from finish to start. Tile effects use those absolute directions regardless of the moving dango's current travel direction.
+Forward always means increasing progress from start toward completing the lap. Backward always means decreasing progress toward the start/finish point. Tile effects use those absolute directions regardless of the moving dango's current travel direction.
 
 ### Dango
 
@@ -112,6 +113,7 @@ Initial skills:
 - Lynae: each round has a 60% chance to move by double points, and a 20% chance to be unable to move. If both checks would apply, unable to move wins.
 - Mornye: dice result cycles through `3, 2, 1`.
 - Aemeath: once per race, after first reaching or passing the midpoint, if there is a non-Bu-King dango ahead, teleport to the top of the nearest such dango's stack.
+  If no valid target exists, the skill is not consumed by default.
 - Shorekeeper: die only rolls `2` or `3`.
 
 ## Tile Rules
@@ -145,7 +147,7 @@ from dango_sim.models import Board, RaceConfig
 from dango_sim.simulation import run_simulations
 
 config = RaceConfig(
-    board=Board(finish=30, tiles={5: Booster(), 9: Inhibitor()}),
+    board=Board(finish=32, tiles={5: Booster(), 9: Inhibitor()}),
     participants=[carlotta(), chisa(), shorekeeper()],
 )
 
@@ -161,7 +163,7 @@ The engine validates race configuration before running:
 - `finish` must be positive.
 - Normal dango ids must be unique.
 - At least one normal dango must participate.
-- Tile positions must be within `0..finish`.
+- Tile positions must be within `1..finish-1`; position `0` is the start/finish point and `finish` is lap length, not a board tile.
 - Bu King is created by the engine or added through a controlled config flag, not duplicated by callers.
 
 Invalid configuration raises `ValueError` with a clear message.
@@ -189,6 +191,6 @@ Use deterministic random sources or fixed seeds so tests are stable.
 
 - Race ends immediately when any normal dango reaches or passes finish.
 - Normal dango default dice are `1, 2, 3`.
-- Board is a single-lane track.
+- Board is a single-lane loop track where `0` is both start and finish.
 - Forward and backward are absolute board directions.
 - Participants and board may differ for every race.

@@ -54,7 +54,7 @@ class ShorekeeperSkill:
 @dataclass
 class AemeathSkill:
     used: bool = False
-    consume_on_fail: bool = True
+    consume_on_fail: bool = False
 
     def after_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
         if self.used:

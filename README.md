@@ -2,6 +2,10 @@
 
 Python simulator for configurable single-lane dango races.
 
+The board is a loop: position `0` is both start and finish, and `finish`
+means the number of steps needed to complete one lap. Custom tiles live on
+track positions `1..finish-1`.
+
 ## Run tests
 
 ```bash

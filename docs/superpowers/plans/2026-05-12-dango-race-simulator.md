@@ -10,6 +10,16 @@
 
 ---
 
+## Current Implementation Notes
+
+The accepted implementation uses a loop-board model: position `0` is both
+start and finish, and `finish` is the number of steps required to complete one
+lap. Custom tile positions are limited to `1..finish-1`.
+
+Aemeath's teleport skill is not consumed by default when no valid target exists
+ahead. Callers can opt into consume-on-fail behavior with
+`AemeathSkill(consume_on_fail=True)`.
+
 ## File Structure
 
 - Create `src/dango_sim/__init__.py`: package exports.
@@ -164,13 +174,13 @@ def test_config_validation_rejects_duplicate_normal_dango_ids():
         config.validate()
 
 
-def test_config_validation_rejects_tile_outside_board():
+def test_config_validation_rejects_tile_outside_track_tiles():
     config = RaceConfig(
-        board=Board(finish=10, tiles={11: object()}),
+        board=Board(finish=10, tiles={10: object()}),
         participants=[Dango(id="a", name="A")],
     )
 
-    with pytest.raises(ValueError, match="within"):
+    with pytest.raises(ValueError, match="1"):
         config.validate()
 ```
 
@@ -235,8 +245,8 @@ class RaceConfig:
         if any(dango.id == BU_KING_ID for dango in self.participants):
             raise ValueError("Bu King is managed by the engine and must not be provided")
         for position in self.board.tiles:
-            if position < 0 or position > self.board.finish:
-                raise ValueError("tile positions must be within 0..finish")
+            if not (0 < position < self.board.finish):
+                raise ValueError("tile positions must be within 1..(finish-1)")
         if self.max_rounds <= 0:
             raise ValueError("max_rounds must be positive")
         if self.max_tile_depth <= 0:
