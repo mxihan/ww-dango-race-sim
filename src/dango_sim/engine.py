@@ -15,20 +15,6 @@ class TurnContext:
     blocked: bool = False
 
 
-class RoundRolls(dict[str, int]):
-    def __init__(self, engine: RaceEngine, order: Iterable[str]):
-        super().__init__()
-        self.engine = engine
-        self.order = list(order)
-
-    def __missing__(self, dango_id: str) -> int:
-        if dango_id not in self.order:
-            raise KeyError(dango_id)
-        value = self.engine.roll_for(dango_id)
-        self[dango_id] = value
-        return value
-
-
 class RaceEngine:
     def __init__(self, config: RaceConfig, rng: random.Random | None = None):
         config.validate()
@@ -70,7 +56,7 @@ class RaceEngine:
         ]
 
     def roll_round_values(self, order: Iterable[str]) -> dict[str, int]:
-        return RoundRolls(self, order)
+        return {dango_id: self.roll_for(dango_id) for dango_id in order}
 
     def roll_for(self, dango_id: str) -> int:
         dango = self.dangos[dango_id]

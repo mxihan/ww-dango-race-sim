@@ -16,13 +16,22 @@ class FixedRng:
         return 0.99
 
 
+class RecordingRollsSkill:
+    def __init__(self):
+        self.observed_rolls = []
+
+    def modify_roll(self, dango, movement, state, context, rng):
+        self.observed_rolls.append(sorted(context.round_rolls.values()))
+        return movement
+
+
 def test_normal_dango_reaching_finish_ends_race_immediately():
     config = RaceConfig(
         board=Board(finish=3),
         participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
         include_bu_king=False,
     )
-    engine = RaceEngine(config, rng=FixedRng([3]))
+    engine = RaceEngine(config, rng=FixedRng([3, 1]))
 
     result = engine.run()
 
@@ -98,3 +107,21 @@ def test_ranking_uses_top_to_bottom_for_finished_stacks():
     engine.state = RaceState(positions={10: ["b", "c"], 4: ["a"]})
 
     assert engine.rankings() == ["c", "b", "a"]
+
+
+def test_round_rolls_are_materialized_before_first_turn():
+    skill = RecordingRollsSkill()
+    config = RaceConfig(
+        board=Board(finish=1),
+        participants=[
+            Dango(id="a", name="A", skill=skill),
+            Dango(id="b", name="B"),
+            Dango(id="c", name="C"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([1, 2, 3]))
+
+    engine.run()
+
+    assert skill.observed_rolls == [[1, 2, 3]]
