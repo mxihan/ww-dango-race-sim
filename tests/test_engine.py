@@ -1,5 +1,6 @@
 from dango_sim.engine import RaceEngine
 from dango_sim.models import Board, Dango, RaceConfig, RaceState
+from dango_sim.tiles import Booster, Inhibitor
 
 
 class FixedRng:
@@ -125,3 +126,33 @@ def test_round_rolls_are_materialized_before_first_turn():
     engine.run()
 
     assert skill.observed_rolls == [[1, 2, 3]]
+
+
+def test_engine_resolves_tile_chaining():
+    config = RaceConfig(
+        board=Board(finish=10, tiles={2: Booster(), 3: Booster()}),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([2]))
+
+    engine.take_turn("a")
+
+    assert engine.state.stack_at(4) == ["a"]
+
+
+def test_engine_stops_infinite_tile_loop():
+    config = RaceConfig(
+        board=Board(finish=10, tiles={2: Booster(), 3: Inhibitor()}),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+        max_tile_depth=3,
+    )
+    engine = RaceEngine(config, rng=FixedRng([2]))
+
+    try:
+        engine.take_turn("a")
+    except RuntimeError as exc:
+        assert "tile resolution" in str(exc)
+    else:
+        raise AssertionError("expected tile loop guard")
