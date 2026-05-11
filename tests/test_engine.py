@@ -26,8 +26,8 @@ def test_normal_dango_reaching_finish_ends_race_immediately():
 
     result = engine.run()
 
-    assert result.winner_id == "a"
-    assert tuple(result.rankings) == ("a", "b")
+    assert result.winner_id == "b"
+    assert tuple(result.rankings) == ("b", "a")
     assert result.rounds == 1
 
 
@@ -80,5 +80,21 @@ def test_ranking_uses_nearest_to_finish_then_top_to_bottom():
     )
     engine = RaceEngine(config, rng=FixedRng([]))
     engine.state = RaceState(positions={4: ["a"], 7: ["b", "c"]})
+
+    assert engine.rankings() == ["c", "b", "a"]
+
+
+def test_ranking_uses_top_to_bottom_for_finished_stacks():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[
+            Dango(id="a", name="A"),
+            Dango(id="b", name="B"),
+            Dango(id="c", name="C"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([]))
+    engine.state = RaceState(positions={10: ["b", "c"], 4: ["a"]})
 
     assert engine.rankings() == ["c", "b", "a"]

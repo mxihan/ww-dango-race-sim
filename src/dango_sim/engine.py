@@ -163,7 +163,7 @@ class RaceEngine:
         for position in finish_positions:
             ordered.extend(
                 dango_id
-                for dango_id in self.state.stack_at(position)
+                for dango_id in reversed(self.state.stack_at(position))
                 if dango_id in normal_ids
             )
 
