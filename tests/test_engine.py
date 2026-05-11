@@ -1,5 +1,5 @@
 from dango_sim.engine import RaceEngine
-from dango_sim.models import Board, Dango, RaceConfig, RaceState
+from dango_sim.models import BU_KING_ID, Board, Dango, RaceConfig, RaceState
 from dango_sim.tiles import Booster, Inhibitor
 
 
@@ -171,3 +171,67 @@ def test_engine_stops_infinite_tile_loop():
         assert "tile resolution" in str(exc)
     else:
         raise AssertionError("expected tile loop guard")
+
+
+def test_bu_king_is_added_at_finish_and_excluded_from_ranking():
+    config = RaceConfig(board=Board(finish=10), participants=[Dango(id="a", name="A")])
+    engine = RaceEngine(config, rng=FixedRng([]))
+
+    assert engine.state.stack_at(10) == [BU_KING_ID]
+    assert BU_KING_ID not in engine.rankings()
+
+
+def test_bu_king_starts_acting_on_round_three():
+    config = RaceConfig(board=Board(finish=10), participants=[Dango(id="a", name="A")])
+    engine = RaceEngine(config, rng=FixedRng([1]))
+
+    engine.state.round_number = 2
+    engine.take_bu_king_turn()
+    assert engine.state.stack_at(10) == [BU_KING_ID]
+
+    engine.state.round_number = 3
+    engine.take_bu_king_turn()
+    assert engine.state.stack_at(9) == [BU_KING_ID]
+
+
+def test_bu_king_contacts_stack_and_carries_it_backward_from_bottom():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+    )
+    engine = RaceEngine(config, rng=FixedRng([3]))
+    engine.state = RaceState(positions={10: [BU_KING_ID], 7: ["a", "b"]}, round_number=3)
+
+    engine.take_bu_king_turn()
+
+    assert engine.state.stack_at(7) == []
+    assert engine.state.stack_at(4) == [BU_KING_ID, "a", "b"]
+
+
+def test_bu_king_teleports_to_finish_when_separated_from_last_place():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+    )
+    engine = RaceEngine(config, rng=FixedRng([]))
+    engine.state = RaceState(
+        positions={10: [BU_KING_ID], 2: ["a"], 6: ["b"]},
+        round_number=3,
+    )
+
+    engine.end_round()
+
+    assert engine.state.stack_at(10) == [BU_KING_ID]
+
+
+def test_bu_king_stays_when_on_last_place_stack():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+    )
+    engine = RaceEngine(config, rng=FixedRng([]))
+    engine.state = RaceState(positions={2: [BU_KING_ID, "a"], 6: ["b"]}, round_number=3)
+
+    engine.end_round()
+
+    assert engine.state.stack_at(2) == [BU_KING_ID, "a"]

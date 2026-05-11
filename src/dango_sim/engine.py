@@ -5,7 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Iterable
 
-from dango_sim.models import Dango, RaceConfig, RaceResult, RaceState
+from dango_sim.models import BU_KING_ID, Dango, RaceConfig, RaceResult, RaceState
 
 
 @dataclass
@@ -26,6 +26,13 @@ class RaceEngine:
             dango.id: dango for dango in self.participants
         }
         self.state = RaceState.initial(self.normal_ids())
+        if self.config.include_bu_king:
+            self.dangos[BU_KING_ID] = Dango(
+                id=BU_KING_ID,
+                name="Bu King",
+                is_special=True,
+            )
+            self.state.place_group([BU_KING_ID], self.config.board.finish)
 
     def run(self) -> RaceResult:
         for round_number in range(1, self.config.max_rounds + 1):
@@ -49,6 +56,17 @@ class RaceEngine:
                         rankings=rankings,
                         rounds=round_number,
                     )
+
+            if not self.has_finished():
+                self.take_bu_king_turn()
+                if self.has_finished():
+                    rankings = self.rankings()
+                    return RaceResult(
+                        winner_id=rankings[0],
+                        rankings=rankings,
+                        rounds=round_number,
+                    )
+                self.end_round()
 
         raise RuntimeError("race did not finish within max_rounds")
 
@@ -112,6 +130,48 @@ class RaceEngine:
         self.state.remove_ids(group)
         self.state.place_group(group, destination)
         self.resolve_tiles(group, destination)
+
+    def take_bu_king_turn(self) -> None:
+        if not self.config.include_bu_king or self.state.round_number < 3:
+            return
+
+        roll = int(self.rng.choice([1, 2, 3, 4, 5, 6]))
+        source = self.state.position_of(BU_KING_ID)
+        target = source - roll
+        normal_ids = set(self.normal_ids())
+        contacted_positions = [
+            position
+            for position, stack in self.state.positions.items()
+            if target <= position < source
+            and any(dango_id in normal_ids for dango_id in stack)
+        ]
+
+        bu_group = self.state.lift_group_from(BU_KING_ID)
+        if not contacted_positions:
+            self.move_group_to(bu_group, target)
+            return
+
+        contact = max(contacted_positions)
+        contacted_stack = self.state.stack_at(contact)
+        self.state.remove_ids(contacted_stack)
+        carried_group = bu_group + contacted_stack
+        destination = contact - roll
+        self.state.place_group(carried_group, destination)
+        self.resolve_tiles(carried_group, destination)
+
+    def end_round(self) -> None:
+        if not self.config.include_bu_king:
+            return
+
+        normal_positions = [
+            self.state.position_of(dango_id) for dango_id in self.normal_ids()
+        ]
+        last_place = min(normal_positions)
+        if self.state.position_of(BU_KING_ID) == last_place:
+            return
+
+        self.state.remove_ids([BU_KING_ID])
+        self.state.place_group([BU_KING_ID], self.config.board.finish)
 
     def resolve_tiles(self, group: list[str], position: int) -> None:
         current = position
