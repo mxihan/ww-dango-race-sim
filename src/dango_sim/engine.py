@@ -433,14 +433,27 @@ class RaceEngine:
         return self.state.finished_group is not None
 
     def rankings(self) -> list[str]:
+        return self._rankings(include_specials=False)
+
+    def rankings_with_specials(self) -> list[str]:
+        return self._rankings(include_specials=True)
+
+    def _rankings(self, *, include_specials: bool) -> list[str]:
         normal_ids = set(self.normal_ids())
+        ranked_ids = set(normal_ids)
+        if (
+            include_specials
+            and self.config.include_bu_king
+            and self.state.is_entered(BU_KING_ID)
+        ):
+            ranked_ids.add(BU_KING_ID)
         ordered: list[str] = []
 
         if self.state.finished_group is not None:
             ordered.extend(
                 dango_id
                 for dango_id in self.state.finished_group
-                if dango_id in normal_ids
+                if dango_id in ranked_ids
             )
 
         remaining_positions = sorted(
@@ -454,7 +467,7 @@ class RaceEngine:
             ordered.extend(
                 dango_id
                 for dango_id in reversed(self.state.stack_at(position))
-                if dango_id in normal_ids and dango_id not in ordered
+                if dango_id in ranked_ids and dango_id not in ordered
             )
 
         unentered = [

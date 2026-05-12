@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dango_sim.models import Dango, RaceState
+from dango_sim.models import BU_KING_ID, Dango, RaceState
 
 
 def _stack_for(dango: Dango, state: RaceState) -> list[str]:
@@ -180,3 +180,54 @@ class AemeathSkill:
         state.place_group([dango.id], target_position)
         self.used = True
         self.waiting = False
+
+
+@dataclass
+class IunoSkill:
+    used: bool = False
+    midpoint: int | None = None
+
+    def after_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+        self._handle_move_path(dango, state, context, engine)
+
+    def after_any_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+        self._handle_move_path(dango, state, context, engine)
+
+    def _handle_move_path(self, dango: Dango, state: RaceState, context, engine) -> None:
+        if self.used:
+            return
+
+        group = getattr(context, "group", [])
+        if dango.id not in group:
+            return
+
+        path = getattr(context, "path", [])
+        midpoint = (
+            self.midpoint
+            if self.midpoint is not None
+            else engine.config.board.finish // 2
+        )
+        if midpoint not in path:
+            return
+
+        rankings = engine.rankings_with_specials()
+        if dango.id not in rankings:
+            return
+
+        iuno_index = rankings.index(dango.id)
+        normal_ids = set(engine.normal_ids())
+        selected: list[str] = []
+        for neighbor_index in (iuno_index - 1, iuno_index + 1):
+            if neighbor_index < 0 or neighbor_index >= len(rankings):
+                continue
+            neighbor_id = rankings[neighbor_index]
+            if neighbor_id == BU_KING_ID:
+                continue
+            if neighbor_id in normal_ids:
+                selected.append(neighbor_id)
+
+        if selected:
+            position = state.position_of(dango.id)
+            state.remove_ids(selected)
+            state.place_group(list(reversed(selected)), position)
+        self.used = True

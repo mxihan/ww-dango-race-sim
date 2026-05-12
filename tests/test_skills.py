@@ -6,6 +6,7 @@ from dango_sim.skills import (
     CalcharoSkill,
     CarlottaSkill,
     ChangliSkill,
+    IunoSkill,
     JinhsiSkill,
     LynaeSkill,
     MornyeSkill,
@@ -406,6 +407,162 @@ def test_aemeath_ignores_unentered_dango_targets():
     engine_skill = engine.dangos["aemeath"].skill
     assert engine_skill.waiting
     assert engine.state.positions == {6: ["aemeath"]}
+
+
+def test_iuno_teleports_direct_ranked_normal_neighbors_in_ranking_order():
+    config = RaceConfig(
+        board=Board(finish=12),
+        participants=[
+            Dango(id="leader", name="Leader"),
+            Dango(id="iuno", name="Iuno", skill=IunoSkill()),
+            Dango(id="trailer", name="Trailer"),
+            Dango(id="far", name="Far"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(
+        positions={8: ["leader"], 5: ["iuno"], 4: ["trailer"], 1: ["far"]}
+    )
+
+    engine.take_turn(
+        "iuno",
+        base_roll=1,
+        round_rolls={"leader": 1, "iuno": 1, "trailer": 1, "far": 1},
+    )
+
+    assert engine.dangos["iuno"].skill.used is True
+    assert engine.state.stack_at(6) == ["iuno", "trailer", "leader"]
+    assert engine.state.stack_at(8) == []
+    assert engine.state.stack_at(4) == []
+
+
+def test_iuno_direct_bu_king_neighbor_blocks_that_side_without_skipping():
+    config = RaceConfig(
+        board=Board(finish=12),
+        participants=[
+            Dango(id="leader", name="Leader"),
+            Dango(id="iuno", name="Iuno", skill=IunoSkill()),
+            Dango(id="after_bu", name="After Bu"),
+            Dango(id="trailer", name="Trailer"),
+        ],
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(
+        positions={
+            8: ["leader"],
+            6: [BU_KING_ID],
+            5: ["iuno"],
+            4: ["after_bu"],
+            2: ["trailer"],
+        }
+    )
+
+    engine.take_turn(
+        "iuno",
+        base_roll=1,
+        round_rolls={"leader": 1, "iuno": 1, "after_bu": 1, "trailer": 1},
+    )
+
+    assert engine.dangos["iuno"].skill.used is True
+    assert engine.state.stack_at(6) == [BU_KING_ID, "iuno", "leader"]
+    assert engine.state.stack_at(8) == []
+    assert engine.state.stack_at(4) == ["after_bu"]
+
+
+def test_iuno_triggers_when_carried_through_midpoint():
+    config = RaceConfig(
+        board=Board(finish=12),
+        participants=[
+            Dango(id="leader", name="Leader"),
+            Dango(id="carrier", name="Carrier"),
+            Dango(id="iuno", name="Iuno", skill=IunoSkill()),
+            Dango(id="trailer", name="Trailer"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(
+        positions={8: ["leader"], 5: ["carrier", "iuno"], 4: ["trailer"]}
+    )
+
+    engine.take_turn(
+        "carrier",
+        base_roll=1,
+        round_rolls={"leader": 1, "carrier": 1, "iuno": 1, "trailer": 1},
+    )
+
+    assert engine.dangos["iuno"].skill.used is True
+    assert engine.state.stack_at(6) == ["iuno", "carrier", "leader"]
+    assert engine.state.stack_at(4) == ["trailer"]
+
+
+def test_iuno_triggers_only_once_per_race():
+    config = RaceConfig(
+        board=Board(finish=12),
+        participants=[
+            Dango(id="leader", name="Leader"),
+            Dango(id="iuno", name="Iuno", skill=IunoSkill()),
+            Dango(id="trailer", name="Trailer"),
+            Dango(id="second_trailer", name="Second Trailer"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(
+        positions={
+            8: ["leader"],
+            5: ["iuno"],
+            4: ["trailer"],
+            2: ["second_trailer"],
+        }
+    )
+
+    engine.take_turn(
+        "iuno",
+        base_roll=1,
+        round_rolls={
+            "leader": 1,
+            "iuno": 1,
+            "trailer": 1,
+            "second_trailer": 1,
+        },
+    )
+    engine.state.remove_ids(["leader", "trailer"])
+    engine.state.place_group(["leader"], 8)
+    engine.state.place_group(["trailer"], 4)
+
+    engine.take_turn(
+        "iuno",
+        base_roll=12,
+        round_rolls={
+            "leader": 1,
+            "iuno": 12,
+            "trailer": 1,
+            "second_trailer": 1,
+        },
+    )
+
+    assert engine.dangos["iuno"].skill.used is True
+    assert engine.state.stack_at(6) == []
+    assert engine.state.stack_at(8) == ["leader"]
+    assert engine.state.stack_at(4) == ["trailer"]
+    assert engine.state.stack_at(0) == ["iuno"]
+
+
+def test_iuno_consumes_when_only_direct_neighbors_are_bu_king():
+    config = RaceConfig(
+        board=Board(finish=12),
+        participants=[Dango(id="iuno", name="Iuno", skill=IunoSkill())],
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={5: ["iuno"], 7: [BU_KING_ID]})
+
+    engine.take_turn("iuno", base_roll=1, round_rolls={"iuno": 1})
+
+    assert engine.dangos["iuno"].skill.used is True
+    assert engine.state.stack_at(6) == ["iuno"]
+    assert engine.state.stack_at(7) == [BU_KING_ID]
 
 
 def test_chisa_minimum_check_includes_bu_king_once_bu_king_can_act():
