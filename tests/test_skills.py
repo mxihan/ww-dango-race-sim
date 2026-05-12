@@ -320,3 +320,43 @@ def test_aemeath_consumes_skill_on_fail_when_configured():
     engine_skill = engine.dangos["aemeath"].skill
     assert engine_skill.used is True
     assert engine_skill.waiting is False
+
+
+def test_mornye_rolls_once_for_order_and_once_for_movement():
+    skill = MornyeSkill()
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[Dango(id="m", name="Mornye", skill=skill)],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+
+    assert engine.roll_for_order("m") == 3
+    assert engine.roll_for_movement("m") == 2
+
+
+def test_chisa_uses_base_movement_roll_pool_before_modifiers():
+    skill = ChisaSkill()
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="chisa", name="Chisa", skill=skill),
+            Dango(id="other", name="Other"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    context = TurnContext(
+        round_rolls={"chisa": 1, "other": 1},
+        base_roll=1,
+        movement=1,
+    )
+
+    assert skill.modify_roll(
+        engine.dangos["chisa"],
+        1,
+        engine.state,
+        context,
+        engine.rng,
+    ) == 3
+    assert context.round_rolls == {"chisa": 1, "other": 1}

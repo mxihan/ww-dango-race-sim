@@ -34,7 +34,7 @@ def test_normal_dango_reaching_finish_ends_race_immediately():
         participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
         include_bu_king=False,
     )
-    engine = RaceEngine(config, rng=FixedRng([3, 1]))
+    engine = RaceEngine(config, rng=FixedRng([1, 3, 1, 3]))
 
     result = engine.run()
 
@@ -200,7 +200,7 @@ def test_round_rolls_are_materialized_before_first_turn():
         ],
         include_bu_king=False,
     )
-    engine = RaceEngine(config, rng=FixedRng([1, 2, 3]))
+    engine = RaceEngine(config, rng=FixedRng([1, 1, 1, 1, 2, 3]))
 
     engine.run()
 
@@ -541,6 +541,58 @@ class OrderRecordingRng:
         return 0.5
 
 
+class QueueRng:
+    def __init__(self, choices, shuffles=None):
+        self.choices = list(choices)
+        self.shuffles = list(shuffles or [])
+
+    def choice(self, values):
+        value = self.choices.pop(0)
+        assert value in values
+        return value
+
+    def shuffle(self, values):
+        if self.shuffles:
+            ordered = self.shuffles.pop(0)
+            values[:] = ordered
+
+    def random(self):
+        return 0.99
+
+
+def test_round_order_uses_high_first_order_rolls_and_shuffles_ties():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="a", name="A"),
+            Dango(id="b", name="B"),
+            Dango(id="c", name="C"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=QueueRng([3, 1, 3], shuffles=[["c", "a"]]))
+
+    order_rolls = engine.roll_order_values(["a", "b", "c"], round_number=1)
+    order = engine.order_actors(order_rolls)
+
+    assert order_rolls == {"a": 3, "b": 1, "c": 3}
+    assert order == ["c", "a", "b"]
+
+
+def test_round_order_can_use_low_first_order_rolls():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+        order_direction="low_first",
+    )
+    engine = RaceEngine(config, rng=QueueRng([3, 1]))
+
+    order = engine.order_actors(engine.roll_order_values(["a", "b"], round_number=1))
+
+    assert order == ["b", "a"]
+
+
 def test_bu_king_absent_from_turn_order_when_excluded():
     """Bu King is not in the turn order when include_bu_king=False."""
     config = RaceConfig(
@@ -548,7 +600,7 @@ def test_bu_king_absent_from_turn_order_when_excluded():
         participants=[Dango(id="a", name="A")],
         include_bu_king=False,
     )
-    rng = OrderRecordingRng([3])
+    rng = OrderRecordingRng([3, 3])
     engine = RaceEngine(config, rng=rng)
 
     engine.run()
@@ -575,7 +627,7 @@ def test_run_excludes_bu_king_until_round_three_turn_order():
         participants=[Dango(id="a", name="A")],
         max_rounds=3,
     )
-    engine = RoundOrderRecordingEngine(config, FixedRng([1, 1, 1, 1]))
+    engine = RoundOrderRecordingEngine(config, FixedRng([1, 1, 1, 1, 1, 1, 1, 1]))
 
     try:
         engine.run()
@@ -597,9 +649,7 @@ def test_race_completes_with_bu_king_in_shuffled_order():
         board=Board(finish=10),
         participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
     )
-    rolls = [3, 1, 3, 3, 1, 3, 3, 1, 3, 3, 1, 3]
-    rng = OrderRecordingRng(rolls)
-    engine = RaceEngine(config, rng=rng)
+    engine = RaceEngine(config, rng=random.Random(42))
 
     result = engine.run()
 

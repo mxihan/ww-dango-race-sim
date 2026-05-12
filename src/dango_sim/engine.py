@@ -39,16 +39,15 @@ class RaceEngine:
     def run(self) -> RaceResult:
         for round_number in range(1, self.config.max_rounds + 1):
             self.state.round_number = round_number
+            actors = self.actors_for_round(round_number)
             order = self.build_round_order(round_number)
-            round_rolls = self.roll_round_values(
-                dango_id for dango_id in order if dango_id != BU_KING_ID
-            )
+            round_rolls = self.roll_round_values(actors)
 
             for dango_id in order:
                 if self.has_finished():
                     break
                 if dango_id == BU_KING_ID:
-                    self.take_bu_king_turn()
+                    self.take_bu_king_turn(base_roll=round_rolls[dango_id])
                 else:
                     self.take_turn(
                         dango_id,
@@ -73,12 +72,64 @@ class RaceEngine:
             dango.id for dango in self.participants if not dango.is_special
         ]
 
-    def build_round_order(self, round_number: int) -> list[str]:
-        order = self.normal_ids()
+    def actors_for_round(self, round_number: int) -> list[str]:
+        actors = self.normal_ids()
         if self.config.include_bu_king and round_number >= 3:
-            order.append(BU_KING_ID)
-        self.rng.shuffle(order)
-        return order
+            actors.append(BU_KING_ID)
+        return actors
+
+    def build_round_order(self, round_number: int) -> list[str]:
+        return self.order_actors(
+            self.roll_order_values(
+                self.actors_for_round(round_number),
+                round_number=round_number,
+            )
+        )
+
+    def roll_order_values(
+        self,
+        actors: Iterable[str],
+        *,
+        round_number: int,
+    ) -> dict[str, int]:
+        return {
+            actor_id: self.roll_bu_king_order()
+            if actor_id == BU_KING_ID
+            else self.roll_for_order(actor_id)
+            for actor_id in actors
+        }
+
+    def order_actors(self, order_rolls: dict[str, int]) -> list[str]:
+        reverse = self.config.order_direction == "high_first"
+        ordered: list[str] = []
+        for roll in sorted(set(order_rolls.values()), reverse=reverse):
+            group = [
+                actor_id
+                for actor_id, value in order_rolls.items()
+                if value == roll
+            ]
+            self.rng.shuffle(group)
+            ordered.extend(group)
+        return ordered
+
+    def roll_bu_king_order(self) -> int:
+        faces = [1, 2, 3] if self.config.bu_king_order_faces == "d3" else [1, 2, 3, 4, 5, 6]
+        return int(self.rng.choice(faces))
+
+    def roll_for_order(self, dango_id: str) -> int:
+        return self.roll_with_dice_skill(dango_id)
+
+    def roll_for_movement(self, dango_id: str) -> int:
+        return self.roll_with_dice_skill(dango_id)
+
+    def roll_with_dice_skill(self, dango_id: str) -> int:
+        dango = self.dangos[dango_id]
+        faces = [1, 2, 3]
+        if dango.skill and hasattr(dango.skill, "roll_faces"):
+            faces = list(dango.skill.roll_faces(dango, self.state))
+        if dango.skill and hasattr(dango.skill, "roll"):
+            return int(dango.skill.roll(dango, self.state, self.rng))
+        return int(self.rng.choice(faces))
 
     def normalize_position(self, position: int) -> int:
         return position % self.config.board.finish
@@ -98,17 +149,17 @@ class RaceEngine:
     def path_passes_start(self, path: list[int]) -> bool:
         return 0 in path
 
-    def roll_round_values(self, order: Iterable[str]) -> dict[str, int]:
-        return {dango_id: self.roll_for(dango_id) for dango_id in order}
+    def roll_round_values(self, actors: Iterable[str]) -> dict[str, int]:
+        rolls: dict[str, int] = {}
+        for actor_id in actors:
+            if actor_id == BU_KING_ID:
+                rolls[actor_id] = int(self.rng.choice([1, 2, 3, 4, 5, 6]))
+            else:
+                rolls[actor_id] = self.roll_for_movement(actor_id)
+        return rolls
 
     def roll_for(self, dango_id: str) -> int:
-        dango = self.dangos[dango_id]
-        faces = [1, 2, 3]
-        if dango.skill and hasattr(dango.skill, "roll_faces"):
-            faces = list(dango.skill.roll_faces(dango, self.state))
-        if dango.skill and hasattr(dango.skill, "roll"):
-            return int(dango.skill.roll(dango, self.state, self.rng))
-        return int(self.rng.choice(faces))
+        return self.roll_for_movement(dango_id)
 
     def take_turn(
         self,
