@@ -17,10 +17,9 @@ The implementation should keep each skill independently testable and avoid a bro
 
 Use a minimal extension of the current skill hook system.
 
-The engine already supports dice, movement modification, pre-move behavior, post-move behavior, and reactions to any movement. These new skills only need two small additions:
+The engine already supports dice, movement modification, pre-move behavior, post-move behavior, and reactions to any movement. These new skills only need one small addition:
 
-- A round-start hook for skills that inspect current stack position before the round's action order is resolved.
-- An action-order adjustment path for skills that force a dango to act last in the next round or skip its current action.
+- An action-order adjustment path for skills that force a dango to act last in the next round.
 
 Movement-related skills should continue to use `before_move`, `after_move`, and `after_any_move` where possible.
 
@@ -44,12 +43,11 @@ Out of scope:
 
 ### Augusta
 
-At the start of each round, if Augusta is already entered and is at the top of its current stack:
+After Augusta moves, if Augusta is at the top of its current stack:
 
-- Augusta does not act during that round.
 - Augusta is marked to act last in the next round.
 
-The skip applies only to the current round. The forced-last marker applies only to the next round after the skipped round. If Augusta is unentered at round start, the skill does not trigger.
+The forced-last marker applies only to the next round after the check. If Augusta's movement ends the race, no later round occurs and the marker has no effect.
 
 ### Iuno
 
@@ -57,9 +55,10 @@ Once per race, when Iuno's movement path passes the midpoint of the track:
 
 - The skill triggers whether Iuno moved as the acting dango or was carried by another dango.
 - The midpoint is `board.finish // 2` unless the skill is constructed with an explicit midpoint.
-- Current ranking is calculated with the engine's existing `rankings()` method.
-- The normal dango immediately before Iuno in ranking and the normal dango immediately after Iuno in ranking are selected.
-- Bu King is ignored because `rankings()` excludes special actors.
+- Current ranking for this skill is calculated with a special ranking method that includes Bu King in the sequence.
+- The direct ranked entry immediately before Iuno and the direct ranked entry immediately after Iuno are considered.
+- If either direct neighbor is Bu King, that neighbor is not selected and the search does not skip past Bu King to another dango on that side.
+- Bu King can therefore block selection on one side, but Bu King itself is never selected or teleported.
 - Selected dangos are removed from their current positions and placed on Iuno's current position.
 - The selected dangos' order on Iuno's tile follows their pre-teleport ranking order, from better rank to worse rank.
 - The selected group is placed on top of the existing stack at Iuno's position.
@@ -77,12 +76,12 @@ If Phrolova is unentered, the skill does not trigger before entering the board.
 
 ### Changli
 
-At the start of each round, if Changli is already entered and has one or more dangos below it in the same stack:
+After Changli moves, if Changli has one or more dangos below it in the same stack:
 
 - Roll a probability check.
 - With 65% chance, mark Changli to act last in the next round.
 
-Changli still acts normally in the current round. The forced-last marker applies only to the next round.
+The forced-last marker applies only to the next round after the check. If Changli's movement ends the race, no later round occurs and the marker has no effect.
 
 ### Jinhsi
 
@@ -105,30 +104,36 @@ At the start of movement, if Calcharo is currently last among normal dangos:
 
 The engine should add small, explicit state for order effects:
 
-- `skip_turns_this_round`: normal dango ids that should not act in the current round.
 - `force_last_next_round`: normal dango ids that should be moved to the end of the next round's order.
 - `force_last_this_round`: internal round-local copy consumed when building the round order.
 
 At each round:
 
 1. Move pending `force_last_next_round` ids into the current round's order adjustment state.
-2. Clear current skip state.
-3. Call round-start hooks on entered and unentered participants. Each skill decides whether the dango's state qualifies.
-4. Build the order from normal dice rules.
-5. Move any forced-last ids that are present in the order to the end, preserving their relative order.
-6. Skip any actor in `skip_turns_this_round` when its turn is reached.
+2. Build the order from normal dice rules.
+3. Move any forced-last ids that are present in the order to the end, preserving their relative order.
+4. Resolve turns normally.
+5. Let post-move hooks mark ids for the next round.
 
-The hook can be named `on_round_start(dango, state, engine, rng)` so skills can use existing state helpers and engine ranking logic.
+No round-start hook is needed for these rules after the Augusta and Changli checks move to post-movement timing.
+
+The engine should also provide a ranking helper for Iuno that includes Bu King while preserving the same ordering semantics as normal rankings:
+
+- Finished normal dangos first, if any finish state exists.
+- Remaining occupied positions by forward distance to start.
+- Stack order from top to bottom within each position.
+- Unentered normal dangos after entered dangos.
+- Bu King included at its occupied position when present, but excluded from final race results.
 
 ## Testing Plan
 
 Add tests for:
 
-- Augusta skips this round when on top.
-- Augusta is forced last in the following round after skipping.
-- Augusta does not trigger when unentered or not on top.
+- Augusta is forced last in the following round when it ends movement on top.
+- Augusta does not trigger when it does not end movement on top.
 - Iuno teleports adjacent ranked normal dangos to its own tile after passing midpoint.
 - Iuno preserves pre-teleport ranking order for teleported dangos.
+- Iuno includes Bu King when finding adjacent ranked entries but never selects Bu King.
 - Iuno triggers when carried through the midpoint.
 - Phrolova gains 3 movement when at stack bottom.
 - Phrolova does not gain movement when unentered or not at bottom.
@@ -149,6 +154,7 @@ uv run pytest
 
 - No placeholder sections remain.
 - The ambiguous Iuno phrase has been resolved as "teleport selected ranked neighbors to Iuno's own tile."
+- Iuno's neighbor calculation now includes Bu King in ranking context while excluding Bu King from selected teleport targets.
 - Calcharo uses ranking position, not track position.
-- Augusta and Changli both use next-round forced-last behavior, but only Augusta skips the current round.
+- Augusta and Changli both check after their own movement and can mark themselves last for the next round.
 - The design keeps the current hook architecture and avoids a full event bus.
