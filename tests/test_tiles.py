@@ -1,11 +1,18 @@
-import random
-
 from dango_sim.models import BU_KING_ID, RaceState
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
 
 class FixedRng:
     def shuffle(self, values):
+        values.reverse()
+
+
+class RecordingShuffleRng:
+    def __init__(self):
+        self.seen_values = None
+
+    def shuffle(self, values):
+        self.seen_values = list(values)
         values.reverse()
 
 
@@ -32,9 +39,10 @@ def test_space_time_rift_reorders_stack_at_position():
 
 def test_rift_keeps_bu_king_at_bottom_when_present():
     state = RaceState(positions={2: [BU_KING_ID, "a", "b"]})
-    rng = random.Random(1)
+    rng = RecordingShuffleRng()
 
     SpaceTimeRift().on_landed(["a", "b"], 2, state, rng)
 
+    assert rng.seen_values == ["a", "b"]
     assert state.positions[2][0] == BU_KING_ID
-    assert sorted(state.positions[2][1:]) == ["a", "b"]
+    assert state.positions[2][1:] == ["b", "a"]
