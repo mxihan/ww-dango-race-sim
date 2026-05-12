@@ -5,6 +5,27 @@ from dataclasses import dataclass
 from dango_sim.models import Dango, RaceState
 
 
+def _stack_for(dango: Dango, state: RaceState) -> list[str]:
+    if not state.is_entered(dango.id):
+        return []
+    return state.stack_at(state.position_of(dango.id))
+
+
+def _is_bottom(dango: Dango, state: RaceState) -> bool:
+    stack = _stack_for(dango, state)
+    return bool(stack) and stack[0] == dango.id
+
+
+def _has_above(dango: Dango, state: RaceState) -> bool:
+    stack = _stack_for(dango, state)
+    return dango.id in stack and stack.index(dango.id) < len(stack) - 1
+
+
+def _has_below(dango: Dango, state: RaceState) -> bool:
+    stack = _stack_for(dango, state)
+    return dango.id in stack and stack.index(dango.id) > 0
+
+
 @dataclass
 class CarlottaSkill:
     chance: float = 0.28
@@ -61,6 +82,52 @@ class AugustaSkill:
         if stack and stack[-1] == dango.id:
             engine.skip_turn_this_round(dango.id)
             engine.force_last_next_round(dango.id)
+
+
+@dataclass
+class PhrolovaSkill:
+    bonus: int = 3
+
+    def before_move(self, dango: Dango, state: RaceState, context, rng) -> None:
+        if _is_bottom(dango, state):
+            context.movement += self.bonus
+
+
+@dataclass
+class JinhsiSkill:
+    chance: float = 0.40
+
+    def on_turn_start(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+        if not _has_above(dango, state) or rng.random() >= self.chance:
+            return
+
+        position = state.position_of(dango.id)
+        stack = state.positions[position]
+        stack.remove(dango.id)
+        stack.append(dango.id)
+
+
+@dataclass
+class ChangliSkill:
+    chance: float = 0.65
+
+    def after_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+        if _has_below(dango, state) and rng.random() < self.chance:
+            engine.force_last_next_round(dango.id)
+
+
+@dataclass
+class CalcharoSkill:
+    bonus: int = 3
+
+    def before_move(self, dango: Dango, state: RaceState, context, rng) -> None:
+        engine = getattr(context, "engine", None)
+        if engine is None:
+            return
+
+        rankings = engine.rankings()
+        if rankings and rankings[-1] == dango.id:
+            context.movement += self.bonus
 
 
 @dataclass

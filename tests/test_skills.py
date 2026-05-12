@@ -3,9 +3,13 @@ from dango_sim.models import BU_KING_ID, Board, Dango, RaceConfig, RaceState
 from dango_sim.skills import (
     AemeathSkill,
     AugustaSkill,
+    CalcharoSkill,
     CarlottaSkill,
+    ChangliSkill,
+    JinhsiSkill,
     LynaeSkill,
     MornyeSkill,
+    PhrolovaSkill,
     ChisaSkill,
     ShorekeeperSkill,
 )
@@ -526,3 +530,261 @@ def test_on_turn_start_can_skip_before_movement():
     engine.take_turn("skipped", base_roll=3, round_rolls={"skipped": 3})
 
     assert engine.state.positions == {}
+
+
+def test_phrolova_gains_three_when_bottom_with_rider_above():
+    skill = PhrolovaSkill()
+    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
+    state = RaceState(positions={4: ["phrolova", "rider"]})
+
+    skill.before_move(
+        Dango(id="phrolova", name="Phrolova"),
+        state,
+        context,
+        FixedRng(),
+    )
+
+    assert context.movement == 5
+
+
+def test_phrolova_gains_three_when_alone_in_stack():
+    skill = PhrolovaSkill()
+    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
+    state = RaceState(positions={4: ["phrolova"]})
+
+    skill.before_move(
+        Dango(id="phrolova", name="Phrolova"),
+        state,
+        context,
+        FixedRng(),
+    )
+
+    assert context.movement == 5
+
+
+def test_phrolova_does_not_gain_bonus_when_not_bottom():
+    skill = PhrolovaSkill()
+    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
+    state = RaceState(positions={4: ["base", "phrolova"]})
+
+    skill.before_move(
+        Dango(id="phrolova", name="Phrolova"),
+        state,
+        context,
+        FixedRng(),
+    )
+
+    assert context.movement == 2
+
+
+def test_phrolova_does_not_gain_bonus_when_unentered():
+    skill = PhrolovaSkill()
+    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
+    state = RaceState.empty(["phrolova"])
+
+    skill.before_move(
+        Dango(id="phrolova", name="Phrolova"),
+        state,
+        context,
+        FixedRng(),
+    )
+
+    assert context.movement == 2
+
+
+def test_jinhsi_moves_to_top_before_movement_and_moves_alone_when_probability_triggers():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="base", name="Base"),
+            Dango(id="jinhsi", name="Jinhsi", skill=JinhsiSkill()),
+            Dango(id="rider", name="Rider"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng(randoms=[0.39]))
+    engine.state = RaceState(positions={2: ["base", "jinhsi", "rider"]})
+
+    engine.take_turn(
+        "jinhsi",
+        base_roll=1,
+        round_rolls={"base": 1, "jinhsi": 1, "rider": 1},
+    )
+
+    assert engine.state.stack_at(2) == ["base", "rider"]
+    assert engine.state.stack_at(3) == ["jinhsi"]
+
+
+def test_jinhsi_keeps_stack_position_and_carries_rider_when_probability_misses():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="base", name="Base"),
+            Dango(id="jinhsi", name="Jinhsi", skill=JinhsiSkill()),
+            Dango(id="rider", name="Rider"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng(randoms=[0.40]))
+    engine.state = RaceState(positions={2: ["base", "jinhsi", "rider"]})
+
+    engine.take_turn(
+        "jinhsi",
+        base_roll=1,
+        round_rolls={"base": 1, "jinhsi": 1, "rider": 1},
+    )
+
+    assert engine.state.stack_at(2) == ["base"]
+    assert engine.state.stack_at(3) == ["jinhsi", "rider"]
+
+
+def test_jinhsi_without_dango_above_does_not_consume_rng_or_reorder_before_normal_move():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="base", name="Base"),
+            Dango(id="jinhsi", name="Jinhsi", skill=JinhsiSkill()),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng(randoms=[]))
+    engine.state = RaceState(positions={2: ["base", "jinhsi"]})
+
+    engine.take_turn(
+        "jinhsi",
+        base_roll=1,
+        round_rolls={"base": 1, "jinhsi": 1},
+    )
+
+    assert engine.state.stack_at(2) == ["base"]
+    assert engine.state.stack_at(3) == ["jinhsi"]
+
+
+def test_changli_marks_next_round_last_after_ending_with_dango_below():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="changli", name="Changli", skill=ChangliSkill()),
+            Dango(id="destination_base", name="Destination Base"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng(randoms=[0.0]))
+    engine.state = RaceState(positions={2: ["changli"], 3: ["destination_base"]})
+
+    engine.take_turn(
+        "changli",
+        base_roll=1,
+        round_rolls={"changli": 1, "destination_base": 1},
+    )
+
+    assert engine.state.stack_at(3) == ["destination_base", "changli"]
+    assert engine.force_last_next_round_ids == {"changli"}
+
+
+def test_changli_marks_next_round_last_at_sixty_four_percent_boundary():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="changli", name="Changli", skill=ChangliSkill()),
+            Dango(id="destination_base", name="Destination Base"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng(randoms=[0.64]))
+    engine.state = RaceState(positions={2: ["changli"], 3: ["destination_base"]})
+
+    engine.take_turn(
+        "changli",
+        base_roll=1,
+        round_rolls={"changli": 1, "destination_base": 1},
+    )
+
+    assert engine.force_last_next_round_ids == {"changli"}
+
+
+def test_changli_does_not_mark_next_round_last_at_sixty_five_percent_boundary():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="changli", name="Changli", skill=ChangliSkill()),
+            Dango(id="destination_base", name="Destination Base"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng(randoms=[0.65]))
+    engine.state = RaceState(positions={2: ["changli"], 3: ["destination_base"]})
+
+    engine.take_turn(
+        "changli",
+        base_roll=1,
+        round_rolls={"changli": 1, "destination_base": 1},
+    )
+
+    assert engine.force_last_next_round_ids == set()
+
+
+def test_changli_does_not_mark_next_round_last_without_dango_below_after_move():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="changli", name="Changli", skill=ChangliSkill()),
+            Dango(id="other", name="Other"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={2: ["changli"], 10: ["other"]})
+
+    engine.take_turn(
+        "changli",
+        base_roll=1,
+        round_rolls={"changli": 1, "other": 1},
+    )
+
+    assert engine.state.stack_at(3) == ["changli"]
+    assert engine.force_last_next_round_ids == set()
+
+
+def test_calcharo_gains_three_when_ranked_last_among_normal_dangos():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="leader", name="Leader"),
+            Dango(id="calcharo", name="Calcharo", skill=CalcharoSkill()),
+        ],
+    )
+    engine = RaceEngine(config)
+    engine.state = RaceState(positions={0: [BU_KING_ID], 8: ["leader"], 2: ["calcharo"]})
+    context = TurnContext(round_rolls={"calcharo": 2}, base_roll=2, movement=2)
+    context.engine = engine
+
+    engine.dangos["calcharo"].skill.before_move(
+        engine.dangos["calcharo"],
+        engine.state,
+        context,
+        engine.rng,
+    )
+
+    assert engine.rankings() == ["leader", "calcharo"]
+    assert context.movement == 5
+
+
+def test_calcharo_uses_engine_context_during_turn_movement():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="leader", name="Leader"),
+            Dango(id="calcharo", name="Calcharo", skill=CalcharoSkill()),
+        ],
+    )
+    engine = RaceEngine(config)
+    engine.state = RaceState(positions={0: [BU_KING_ID], 8: ["leader"], 2: ["calcharo"]})
+
+    engine.take_turn(
+        "calcharo",
+        base_roll=2,
+        round_rolls={"leader": 1, "calcharo": 2},
+    )
+
+    assert engine.state.stack_at(7) == ["calcharo"]

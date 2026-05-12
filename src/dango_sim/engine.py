@@ -16,6 +16,7 @@ class TurnContext:
     path: list[int] = field(default_factory=list)
     group: list[str] = field(default_factory=list)
     blocked: bool = False
+    engine: object | None = None
 
 
 class RaceEngine:
@@ -236,6 +237,7 @@ class RaceEngine:
             round_rolls=round_rolls or {dango_id: base_roll},
             base_roll=base_roll,
             movement=base_roll,
+            engine=self,
         )
         dango = self.dangos[dango_id]
         if dango.skill and hasattr(dango.skill, "on_turn_start"):
