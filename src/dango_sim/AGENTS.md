@@ -12,7 +12,7 @@ Core simulation library for dango races. Provides domain models, a turn-based ra
 |------|-------------|
 | `__init__.py` | Public API re-exports: `Board`, `Dango`, `RaceConfig`, `RaceResult`, `SimulationSummary`, `run_simulations` |
 | `models.py` | Domain dataclasses — `Board`, `Dango`, `RaceConfig`, `RaceState`, `RaceResult`; `Skill` and `TileEffect` protocols; `BU_KING_ID` constant |
-| `engine.py` | `RaceEngine` — orchestrates a single race: rolling, turn resolution, Bu King turns, tile chaining, ranking |
+| `engine.py` | `RaceEngine` — orchestrates a single race: rolling, turn resolution, Bu King turns, tile resolution, ranking |
 | `simulation.py` | `run_simulations()` Monte Carlo runner; `SimulationSummary` frozen dataclass with win rates, average rank, average rounds |
 | `skills.py` | Per-dango skill implementations: `CarlottaSkill`, `ChisaSkill`, `LynaeSkill`, `MornyeSkill`, `ShorekeeperSkill`, `AemeathSkill` |
 | `tiles.py` | Tile effect implementations: `Booster` (forward), `Inhibitor` (backward), `SpaceTimeRift` (shuffle stack) |
@@ -36,11 +36,13 @@ Core simulation library for dango races. Provides domain models, a turn-based ra
 1. Create a frozen dataclass in `tiles.py` implementing `on_landed(group, position, state, rng) -> int`
 2. Return the new position (same position = no further movement)
 3. Place it on the `Board.tiles` mapping
+4. Tile resolution defaults to single-trigger behavior. Use `RaceConfig(tile_resolution="chain")` for chained tile maps.
 
 #### Bu King (special participant)
 - Auto-injected by the engine when `RaceConfig.include_bu_king=True`
-- Starts at the finish line, moves backward each round (after round 3)
-- Carries normal dangos it passes; teleports behind last place at round end
+- Starts at position `0`, joins turn order from round 3, and moves backward step-by-step around the loop.
+- Carries normal dangos it contacts from the bottom of the stack.
+- At round end, returns to position `0` only when it is not carrying dango and cannot contact any dango before reaching `0`.
 
 ### Testing Requirements
 - Corresponding test file for each module in `tests/`
@@ -59,8 +61,8 @@ Core simulation library for dango races. Provides domain models, a turn-based ra
 ### Internal
 - `models.py` is imported by every other module
 - `engine.py` imports from `models` and is imported by `simulation`
-- `skills.py` imports `BU_KING_ID`, `Dango`, `RaceState` from `models`
-- `tiles.py` imports `RaceState` from `models`
+- `skills.py` imports `Dango`, `RaceState` from `models`
+- `tiles.py` imports `BU_KING_ID`, `RaceState` from `models`
 
 ### External
 - `random` (stdlib) — all randomness via `random.Random` instances
