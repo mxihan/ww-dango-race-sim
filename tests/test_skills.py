@@ -704,7 +704,7 @@ def test_phrolova_gains_three_when_bottom_with_rider_above():
     assert context.movement == 5
 
 
-def test_phrolova_gains_three_when_alone_in_stack():
+def test_phrolova_does_not_gain_bonus_when_alone_in_stack():
     skill = PhrolovaSkill()
     context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
     state = RaceState(positions={4: ["phrolova"]})
@@ -716,7 +716,7 @@ def test_phrolova_gains_three_when_alone_in_stack():
         FixedRng(),
     )
 
-    assert context.movement == 5
+    assert context.movement == 2
 
 
 def test_phrolova_does_not_gain_bonus_when_not_bottom():

@@ -13,7 +13,7 @@ def _stack_for(dango: Dango, state: RaceState) -> list[str]:
 
 def _is_bottom(dango: Dango, state: RaceState) -> bool:
     stack = _stack_for(dango, state)
-    return bool(stack) and stack[0] == dango.id
+    return bool(stack) and stack[0] == dango.id and len(stack) >= 2
 
 
 def _has_above(dango: Dango, state: RaceState) -> bool:

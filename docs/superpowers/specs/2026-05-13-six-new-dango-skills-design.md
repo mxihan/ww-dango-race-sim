@@ -70,11 +70,11 @@ If Iuno is not present in rankings when the midpoint condition is met, the skill
 
 ### Phrolova
 
-At the start of movement, if Phrolova is already entered and is at the bottom of its current stack:
+At the start of movement, if Phrolova is already entered, is at the bottom of its current stack, and that stack contains at least two dangos:
 
 - Add 3 to Phrolova's movement for that turn.
 
-If Phrolova is alone in its stack, it is still considered to be at the bottom and the skill triggers.
+If Phrolova is alone in its stack, the skill does not trigger.
 
 If Phrolova is unentered, the skill does not trigger before entering the board.
 
@@ -143,8 +143,7 @@ Add tests for:
 - Iuno includes Bu King when finding adjacent ranked entries but never selects Bu King.
 - Iuno triggers when carried through the midpoint.
 - Phrolova gains 3 movement when at stack bottom.
-- Phrolova gains 3 movement when alone in its stack.
-- Phrolova does not gain movement when unentered or not at bottom.
+- Phrolova does not gain movement when alone, unentered, or not at bottom.
 - Changli can mark itself last next round when dango exist below it.
 - Changli does not mark itself when no dango is below it.
 - Jinhsi can move to top at the start of its own turn when dango exist above it.
@@ -165,7 +164,7 @@ uv run pytest
 - Iuno's neighbor calculation now includes Bu King in ranking context while excluding Bu King from selected teleport targets.
 - Calcharo uses ranking position, not track position.
 - Augusta checks at round start, skips that round, and marks itself last for the next round.
-- Phrolova alone in a stack counts as bottom.
+- Phrolova alone in a stack does not trigger the bottom-stack bonus.
 - Changli checks after its own movement and can mark itself last for the next round.
 - Jinhsi checks at the start of its own turn before movement.
 - The design keeps the current hook architecture and avoids a full event bus.
