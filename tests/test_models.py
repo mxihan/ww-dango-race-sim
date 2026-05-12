@@ -1,6 +1,14 @@
 import pytest
 
-from dango_sim.models import Board, Dango, RaceConfig, RaceResult, RaceState
+from dango_sim.models import (
+    BU_KING_ID,
+    Board,
+    Dango,
+    RaceConfig,
+    RaceResult,
+    RaceStartingState,
+    RaceState,
+)
 
 
 def test_board_accepts_finish_position():
@@ -140,3 +148,61 @@ def test_race_result_stores_rankings_as_immutable_tuple():
     assert result.rankings == ("a", "b")
     with pytest.raises(AttributeError):
         result.rankings.append("c")
+
+
+def test_config_defaults_turn_order_and_no_starting_state():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+    )
+
+    assert config.order_direction == "high_first"
+    assert config.bu_king_order_faces == "d3"
+    assert config.starting_state is None
+    config.validate()
+
+
+def test_config_accepts_low_first_and_d6_bu_king_order_faces():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        order_direction="low_first",
+        bu_king_order_faces="d6",
+    )
+
+    config.validate()
+
+
+def test_config_rejects_unknown_order_direction():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        order_direction="sideways",
+    )
+
+    with pytest.raises(ValueError, match="order_direction"):
+        config.validate()
+
+
+def test_config_rejects_unknown_bu_king_order_faces():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        bu_king_order_faces="d20",
+    )
+
+    with pytest.raises(ValueError, match="bu_king_order_faces"):
+        config.validate()
+
+
+def test_starting_state_copies_positions_and_laps():
+    starting_state = RaceStartingState(
+        positions={0: ["a"], 4: ["bu_king", "b"]},
+        laps_completed={"a": 1, "b": 0},
+    )
+
+    assert starting_state.positions[4] == ("bu_king", "b")
+    assert starting_state.laps_completed["a"] == 1
+
+    with pytest.raises(TypeError):
+        starting_state.positions[0] = ("b",)

@@ -33,6 +33,34 @@ class Dango:
     is_special: bool = False
 
 
+@dataclass(frozen=True)
+class RaceStartingState:
+    positions: Mapping[int, tuple[str, ...] | list[str]]
+    laps_completed: Mapping[str, int]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "positions",
+            MappingProxyType(
+                {
+                    int(position): tuple(stack)
+                    for position, stack in self.positions.items()
+                }
+            ),
+        )
+        object.__setattr__(
+            self,
+            "laps_completed",
+            MappingProxyType(
+                {
+                    str(dango_id): int(laps)
+                    for dango_id, laps in self.laps_completed.items()
+                }
+            ),
+        )
+
+
 @dataclass
 class RaceConfig:
     board: Board
@@ -41,6 +69,9 @@ class RaceConfig:
     max_rounds: int = 500
     max_tile_depth: int = 20
     tile_resolution: str = "single"
+    order_direction: str = "high_first"
+    bu_king_order_faces: str = "d3"
+    starting_state: RaceStartingState | None = None
 
     def validate(self) -> None:
         if self.board.finish <= 0:
@@ -61,6 +92,34 @@ class RaceConfig:
             raise ValueError("max_tile_depth must be positive")
         if self.tile_resolution not in {"single", "chain"}:
             raise ValueError("tile_resolution must be 'single' or 'chain'")
+        if self.order_direction not in {"high_first", "low_first"}:
+            raise ValueError("order_direction must be 'high_first' or 'low_first'")
+        if self.bu_king_order_faces not in {"d3", "d6"}:
+            raise ValueError("bu_king_order_faces must be 'd3' or 'd6'")
+        if self.starting_state is not None:
+            self._validate_starting_state(normal_ids)
+
+    def _validate_starting_state(self, normal_ids: list[str]) -> None:
+        assert self.starting_state is not None
+        seen: list[str] = []
+        for position, stack in self.starting_state.positions.items():
+            if not (0 <= position < self.board.finish):
+                raise ValueError("starting_state positions must be within 0..(finish-1)")
+            if not stack:
+                raise ValueError("starting_state stacks must not be empty")
+            seen.extend(dango_id for dango_id in stack if dango_id != BU_KING_ID)
+
+        if sorted(seen) != sorted(normal_ids):
+            raise ValueError("starting_state must include every normal dango exactly once")
+        if len(seen) != len(set(seen)):
+            raise ValueError("starting_state normal dango ids must be unique")
+
+        lap_ids = set(self.starting_state.laps_completed)
+        if lap_ids != set(normal_ids):
+            raise ValueError("starting_state laps_completed must include every normal dango")
+        for dango_id, laps in self.starting_state.laps_completed.items():
+            if laps < 0:
+                raise ValueError("starting_state laps_completed values must be non-negative")
 
 
 @dataclass
