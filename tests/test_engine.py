@@ -466,39 +466,35 @@ def test_bu_king_wrapping_move_keeps_positions_normalized():
     assert engine.state.positions == {6: [BU_KING_ID, "a"]}
 
 
-def test_bu_king_teleports_to_finish_when_separated_from_last_place():
+def test_bu_king_returns_to_zero_when_no_dango_ahead_before_start():
     config = RaceConfig(
-        board=Board(finish=10),
+        board=Board(finish=8),
         participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
     )
-    engine = RaceEngine(config, rng=FixedRng([]))
-    engine.state = RaceState(
-        positions={10: [BU_KING_ID], 2: ["a"], 6: ["b"]},
-        round_number=3,
-    )
+    engine = RaceEngine(config)
+    engine.state.round_number = 3
+    engine.state.positions = {5: [BU_KING_ID], 6: ["a"], 7: ["b"]}
 
     engine.end_round()
 
-    assert engine.state.stack_at(10) == [BU_KING_ID]
+    assert engine.state.position_of(BU_KING_ID) == 0
 
 
-def test_bu_king_stays_when_it_can_still_reach_last_place():
+def test_bu_king_stays_when_dango_ahead_before_start():
     config = RaceConfig(
-        board=Board(finish=10),
+        board=Board(finish=8),
         participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
     )
-    engine = RaceEngine(config, rng=FixedRng([]))
-    engine.state = RaceState(
-        positions={5: [BU_KING_ID], 2: ["a"], 6: ["b"]},
-        round_number=3,
-    )
+    engine = RaceEngine(config)
+    engine.state.round_number = 3
+    engine.state.positions = {5: [BU_KING_ID], 4: ["a"], 7: ["b"]}
 
     engine.end_round()
 
-    assert engine.state.stack_at(5) == [BU_KING_ID]
+    assert engine.state.position_of(BU_KING_ID) == 5
 
 
-def test_bu_king_teleports_after_passing_last_place_toward_start():
+def test_bu_king_returns_to_zero_after_passing_dangos_toward_start():
     config = RaceConfig(
         board=Board(finish=10),
         participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
@@ -511,20 +507,21 @@ def test_bu_king_teleports_after_passing_last_place_toward_start():
 
     engine.end_round()
 
-    assert engine.state.stack_at(10) == [BU_KING_ID]
+    assert engine.state.stack_at(0) == [BU_KING_ID]
 
 
-def test_bu_king_stays_when_on_last_place_stack():
+def test_bu_king_stays_when_carrying_dango_above_it():
     config = RaceConfig(
-        board=Board(finish=10),
-        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        board=Board(finish=8),
+        participants=[Dango(id="a", name="A")],
     )
-    engine = RaceEngine(config, rng=FixedRng([]))
-    engine.state = RaceState(positions={2: [BU_KING_ID, "a"], 6: ["b"]}, round_number=3)
+    engine = RaceEngine(config)
+    engine.state.round_number = 3
+    engine.state.positions = {5: [BU_KING_ID, "a"]}
 
     engine.end_round()
 
-    assert engine.state.stack_at(2) == [BU_KING_ID, "a"]
+    assert engine.state.position_of(BU_KING_ID) == 5
 
 
 class OrderRecordingRng:

@@ -216,18 +216,35 @@ class RaceEngine:
         self.after_any_move(final_group, path, BU_KING_ID)
 
     def end_round(self) -> None:
-        if not self.config.include_bu_king:
+        if not self.config.include_bu_king or self.state.round_number < 3:
             return
-
-        normal_positions = [
-            self.state.position_of(dango_id) for dango_id in self.normal_ids()
-        ]
-        last_place = min(normal_positions)
-        if self.state.position_of(BU_KING_ID) >= last_place:
+        if self.bu_king_has_dango_above():
             return
+        if not self.has_normal_dango_ahead_of_bu_king():
+            self.state.remove_ids([BU_KING_ID])
+            self.state.place_group([BU_KING_ID], 0, bottom=True)
 
-        self.state.remove_ids([BU_KING_ID])
-        self.state.place_group([BU_KING_ID], self.config.board.finish)
+    def bu_king_has_dango_above(self) -> bool:
+        position = self.state.position_of(BU_KING_ID)
+        stack = self.state.stack_at(position)
+        index = stack.index(BU_KING_ID)
+        return any(
+            dango_id in self.normal_ids()
+            for dango_id in stack[index + 1:]
+        )
+
+    def has_normal_dango_ahead_of_bu_king(self) -> bool:
+        normal_ids = set(self.normal_ids())
+        position = self.state.position_of(BU_KING_ID)
+        current = position
+        while current != 0:
+            current = self.previous_position(current)
+            if any(
+                dango_id in normal_ids
+                for dango_id in self.state.stack_at(current)
+            ):
+                return True
+        return False
 
     def resolve_tiles(self, group: list[str], position: int) -> None:
         if self.config.tile_resolution == "single":
