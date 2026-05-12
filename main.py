@@ -7,18 +7,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
-from dango_sim.models import Board, Dango, RaceConfig
+from dango_sim.sample_config import build_sample_config
 from dango_sim.simulation import run_simulations
-from dango_sim.skills import (
-    AemeathSkill,
-    CarlottaSkill,
-    LynaeSkill,
-    MornyeSkill,
-    ChisaSkill,
-    ShorekeeperSkill,
-)
 from dango_sim.state_io import load_starting_state
-from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
 
 def positive_int(value: str) -> int:
@@ -26,37 +17,6 @@ def positive_int(value: str) -> int:
     if parsed <= 0:
         raise argparse.ArgumentTypeError("must be positive")
     return parsed
-
-
-def build_sample_config(starting_state=None) -> RaceConfig:
-    # Board layout (32 tiles, start/finish share position 0):
-    #   0 = start = finish
-    #   1..31 = track tiles (1 = first tile ahead of start)
-    #   finish = 32 means dangos travel 32 tiles to complete a lap
-    return RaceConfig(
-        board=Board(
-            finish=32,
-            tiles={
-                3: Booster(),
-                6: SpaceTimeRift(),
-                10: Inhibitor(),
-                11: Booster(),
-                16: Booster(),
-                20: SpaceTimeRift(),
-                23: Booster(),
-                28: Inhibitor(),
-            },
-        ),
-        participants=[
-            Dango(id="carlotta", name="珂莱塔团子", skill=CarlottaSkill()),
-            Dango(id="chisa", name="千咲团子", skill=ChisaSkill()),
-            Dango(id="lynae", name="琳奈团子", skill=LynaeSkill()),
-            Dango(id="mornye", name="莫宁团子", skill=MornyeSkill()),
-            Dango(id="aemeath", name="爱弥斯团子", skill=AemeathSkill()),
-            Dango(id="shorekeeper", name="守岸人团子", skill=ShorekeeperSkill()),
-        ],
-        starting_state=starting_state,
-    )
 
 
 def main() -> None:
