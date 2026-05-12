@@ -40,6 +40,7 @@ class RaceConfig:
     include_bu_king: bool = True
     max_rounds: int = 500
     max_tile_depth: int = 20
+    tile_resolution: str = "single"
 
     def validate(self) -> None:
         if self.board.finish <= 0:
@@ -58,12 +59,16 @@ class RaceConfig:
             raise ValueError("max_rounds must be positive")
         if self.max_tile_depth <= 0:
             raise ValueError("max_tile_depth must be positive")
+        if self.tile_resolution not in {"single", "chain"}:
+            raise ValueError("tile_resolution must be 'single' or 'chain'")
 
 
 @dataclass
 class RaceState:
     positions: dict[int, list[str]]
     round_number: int = 0
+    finished_group: list[str] | None = None
+    finished_position: int | None = None
 
     @classmethod
     def initial(cls, dango_ids: list[str], start_position: int = 0) -> RaceState:

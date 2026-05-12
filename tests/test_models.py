@@ -92,6 +92,45 @@ def test_config_validation_rejects_tile_at_start():
         config.validate()
 
 
+def test_config_defaults_to_single_tile_resolution():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+    )
+
+    assert config.tile_resolution == "single"
+    config.validate()
+
+
+def test_config_accepts_chain_tile_resolution():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        tile_resolution="chain",
+    )
+
+    config.validate()
+
+
+def test_config_rejects_unknown_tile_resolution():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        tile_resolution="forever",
+    )
+
+    with pytest.raises(ValueError, match="tile_resolution"):
+        config.validate()
+
+
+def test_race_state_records_finishing_group():
+    state = RaceState.initial(["a", "b"])
+
+    state.finished_group = ["b", "a"]
+
+    assert state.finished_group == ["b", "a"]
+
+
 def test_race_result_stores_rankings_as_immutable_tuple():
     rankings = ["a", "b"]
     result = RaceResult(winner_id="a", rankings=rankings, rounds=3)
