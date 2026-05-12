@@ -165,3 +165,29 @@ def test_run_simulations_summary_cannot_be_mutated_through_source_mappings():
     assert dict(summary.wins) == {"a": 1}
     assert dict(summary.win_rates) == {"a": 1.0}
     assert dict(summary.average_rank) == {"a": 1.0}
+
+
+def test_run_simulations_reports_top_n_rates():
+    StubEngine.results = [
+        RaceResult(winner_id="a", rankings=["a", "b", "c"], rounds=1),
+        RaceResult(winner_id="b", rankings=["b", "c", "a"], rounds=1),
+        RaceResult(winner_id="c", rankings=["c", "a", "b"], rounds=1),
+    ]
+
+    summary = run_simulations(
+        config_factory=lambda: RaceConfig(
+            board=Board(finish=10),
+            participants=[
+                Dango(id="a", name="A"),
+                Dango(id="b", name="B"),
+                Dango(id="c", name="C"),
+            ],
+            include_bu_king=False,
+        ),
+        runs=3,
+        top_n=[1, 2],
+        engine_cls=StubEngine,
+    )
+
+    assert dict(summary.top_n_rates[1]) == {"a": 1 / 3, "b": 1 / 3, "c": 1 / 3}
+    assert dict(summary.top_n_rates[2]) == {"a": 2 / 3, "b": 2 / 3, "c": 2 / 3}

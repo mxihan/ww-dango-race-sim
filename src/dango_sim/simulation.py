@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Callable, Mapping
+from typing import Callable, Iterable, Mapping
 
 from dango_sim.engine import RaceEngine
 from dango_sim.models import RaceConfig
@@ -16,6 +16,7 @@ class SimulationSummary:
     win_rates: Mapping[str, float]
     average_rank: Mapping[str, float]
     average_rounds: float
+    top_n_rates: Mapping[int, Mapping[str, float]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "wins", MappingProxyType(dict(self.wins)))
@@ -29,6 +30,16 @@ class SimulationSummary:
             "average_rank",
             MappingProxyType(dict(self.average_rank)),
         )
+        object.__setattr__(
+            self,
+            "top_n_rates",
+            MappingProxyType(
+                {
+                    int(n): MappingProxyType(dict(rates))
+                    for n, rates in self.top_n_rates.items()
+                }
+            ),
+        )
 
 
 def run_simulations(
@@ -37,6 +48,7 @@ def run_simulations(
     runs: int,
     seed: int | None = None,
     engine_cls=RaceEngine,
+    top_n: Iterable[int] = (),
 ) -> SimulationSummary:
     if runs <= 0:
         raise ValueError("runs must be positive")
@@ -46,6 +58,13 @@ def run_simulations(
     rank_totals: dict[str, int] = {}
     rank_counts: dict[str, int] = {}
     total_rounds = 0
+
+    top_n_values = sorted({int(value) for value in top_n})
+    if any(value <= 0 for value in top_n_values):
+        raise ValueError("top_n values must be positive")
+    top_n_counts: dict[int, dict[str, int]] = {
+        value: {} for value in top_n_values
+    }
 
     for _ in range(runs):
         config = config_factory()
@@ -60,10 +79,23 @@ def run_simulations(
             rank_totals[dango_id] = rank_totals.get(dango_id, 0) + rank
             rank_counts[dango_id] = rank_counts.get(dango_id, 0) + 1
 
+        for n in top_n_values:
+            for dango_id in result.rankings[:n]:
+                top_n_counts[n][dango_id] = top_n_counts[n].get(dango_id, 0) + 1
+            for dango_id in result.rankings:
+                top_n_counts[n].setdefault(dango_id, 0)
+
     win_rates = {dango_id: count / runs for dango_id, count in wins.items()}
     average_rank = {
         dango_id: rank_totals[dango_id] / rank_counts[dango_id]
         for dango_id in rank_totals
+    }
+    top_n_rates = {
+        n: {
+            dango_id: count / runs
+            for dango_id, count in counts.items()
+        }
+        for n, counts in top_n_counts.items()
     }
 
     return SimulationSummary(
@@ -72,4 +104,5 @@ def run_simulations(
         win_rates=win_rates,
         average_rank=average_rank,
         average_rounds=total_rounds / runs,
+        top_n_rates=top_n_rates,
     )
