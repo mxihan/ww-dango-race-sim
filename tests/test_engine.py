@@ -70,7 +70,7 @@ def test_normal_dango_wraps_without_finishing_when_start_not_passed():
 
     assert not engine.has_finished()
     assert engine.state.positions == {3: ["b", "a"]}
-    assert engine.rankings() == ["b", "a"]
+    assert engine.rankings() == ["a", "b"]
 
 
 def test_lower_dango_carries_dango_above_it():
@@ -124,6 +124,33 @@ def test_ranking_uses_forward_distance_to_start_and_top_to_bottom():
     engine.state.positions = {6: ["a"], 7: ["b", "c"], 2: []}
 
     assert engine.rankings() == ["c", "b", "a"]
+
+
+def test_ranking_uses_actual_stack_order_for_same_position():
+    config = RaceConfig(
+        board=Board(finish=5),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {1: ["a"], 3: ["b"]}
+
+    engine.take_turn("a", base_roll=2, round_rolls={"a": 2, "b": 1})
+
+    assert engine.state.positions == {3: ["b", "a"]}
+    assert engine.rankings() == ["a", "b"]
+
+
+def test_ranking_treats_start_as_zero_forward_distance():
+    config = RaceConfig(
+        board=Board(finish=8),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {0: ["a"], 7: ["b"]}
+
+    assert engine.rankings() == ["a", "b"]
 
 
 def test_ranking_uses_nearest_to_start_then_top_to_bottom():

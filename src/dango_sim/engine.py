@@ -27,8 +27,6 @@ class RaceEngine:
         self.dangos: dict[str, Dango] = {
             dango.id: dango for dango in self.participants
         }
-        self._last_moved_group: list[str] = []
-        self._last_moved_destination: int | None = None
         self.state = RaceState.initial(self.normal_ids())
         if self.config.include_bu_king:
             self.dangos[BU_KING_ID] = Dango(
@@ -148,8 +146,6 @@ class RaceEngine:
             self.state.finished_group = list(reversed(group))
             self.state.finished_position = 0
             self.state.place_group(group, 0)
-            self._last_moved_group = list(group)
-            self._last_moved_destination = 0
             self.after_any_move(group, path, dango_id)
             return
         self.move_group_to(group, path[-1], actor_id=dango_id, path=path)
@@ -169,8 +165,6 @@ class RaceEngine:
         destination = self.normalize_position(destination)
         self.state.remove_ids(group)
         self.state.place_group(group, destination, bottom=bottom)
-        self._last_moved_group = list(group)
-        self._last_moved_destination = destination
         self.resolve_tiles(group, destination)
         self.after_any_move(group, path or [destination], actor_id)
 
@@ -269,25 +263,11 @@ class RaceEngine:
         for position in remaining_positions:
             ordered.extend(
                 dango_id
-                for dango_id in self.ranking_stack_at(position)
+                for dango_id in reversed(self.state.stack_at(position))
                 if dango_id in normal_ids and dango_id not in ordered
             )
 
         return ordered
 
-    def ranking_stack_at(self, position: int) -> list[str]:
-        stack = self.state.stack_at(position)
-        if (
-            self._last_moved_destination == position
-            and self._last_moved_group
-            and stack[-len(self._last_moved_group) :] == self._last_moved_group
-        ):
-            existing = stack[: -len(self._last_moved_group)]
-            return list(reversed(existing)) + list(reversed(self._last_moved_group))
-        return list(reversed(stack))
-
     def forward_distance_to_start(self, position: int) -> int:
-        normalized = self.normalize_position(position)
-        if normalized == 0:
-            return self.config.board.finish
-        return self.config.board.finish - normalized
+        return (self.config.board.finish - position) % self.config.board.finish
