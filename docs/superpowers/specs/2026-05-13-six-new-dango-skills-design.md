@@ -17,9 +17,10 @@ The implementation should keep each skill independently testable and avoid a bro
 
 Use a minimal extension of the current skill hook system.
 
-The engine already supports dice, movement modification, pre-move behavior, post-move behavior, and reactions to any movement. These new skills only need one small addition:
+The engine already supports dice, movement modification, pre-move behavior, post-move behavior, and reactions to any movement. These new skills need two small additions:
 
-- An action-order adjustment path for skills that force a dango to act last in the next round.
+- A round-start hook for skills that inspect the current stack before the round's action order is resolved.
+- An action-order adjustment path for skills that skip the current round or force a dango to act last in the next round.
 
 Movement-related skills should continue to use `before_move`, `after_move`, and `after_any_move` where possible.
 
@@ -43,11 +44,12 @@ Out of scope:
 
 ### Augusta
 
-After Augusta moves, if Augusta is at the top of its current stack:
+At the start of each round, if Augusta is already entered and is at the top of its current stack:
 
+- Augusta does not act during that round.
 - Augusta is marked to act last in the next round.
 
-The forced-last marker applies only to the next round after the check. If Augusta's movement ends the race, no later round occurs and the marker has no effect.
+The skip applies only to the current round. The forced-last marker applies only to the next round after the skipped round. If Augusta is unentered at round start, the skill does not trigger.
 
 ### Iuno
 
@@ -72,6 +74,8 @@ At the start of movement, if Phrolova is already entered and is at the bottom of
 
 - Add 3 to Phrolova's movement for that turn.
 
+If Phrolova is alone in its stack, it is still considered to be at the bottom and the skill triggers.
+
 If Phrolova is unentered, the skill does not trigger before entering the board.
 
 ### Changli
@@ -85,7 +89,7 @@ The forced-last marker applies only to the next round after the check. If Changl
 
 ### Jinhsi
 
-At the start of movement, if Jinhsi is already entered and has one or more dangos above it in the same stack:
+At the start of Jinhsi's own turn, before movement is applied, if Jinhsi is already entered and has one or more dangos above it in the same stack:
 
 - Roll a probability check.
 - With 40% chance, move Jinhsi to the top of its current stack before movement is applied.
@@ -104,18 +108,21 @@ At the start of movement, if Calcharo is currently last among normal dangos:
 
 The engine should add small, explicit state for order effects:
 
+- `skip_turns_this_round`: normal dango ids that should not act in the current round.
 - `force_last_next_round`: normal dango ids that should be moved to the end of the next round's order.
 - `force_last_this_round`: internal round-local copy consumed when building the round order.
 
 At each round:
 
 1. Move pending `force_last_next_round` ids into the current round's order adjustment state.
-2. Build the order from normal dice rules.
-3. Move any forced-last ids that are present in the order to the end, preserving their relative order.
-4. Resolve turns normally.
-5. Let post-move hooks mark ids for the next round.
+2. Clear current skip state.
+3. Call round-start hooks on participants. Each skill decides whether the dango's state qualifies.
+4. Build the order from normal dice rules.
+5. Move any forced-last ids that are present in the order to the end, preserving their relative order.
+6. Skip any actor in `skip_turns_this_round` when its turn is reached.
+7. Let post-move hooks mark ids for the next round.
 
-No round-start hook is needed for these rules after the Augusta and Changli checks move to post-movement timing.
+The round-start hook can be named `on_round_start(dango, state, engine, rng)` so Augusta can inspect stack state before the current round's order is resolved.
 
 The engine should also provide a ranking helper for Iuno that includes Bu King while preserving the same ordering semantics as normal rankings:
 
@@ -129,18 +136,19 @@ The engine should also provide a ranking helper for Iuno that includes Bu King w
 
 Add tests for:
 
-- Augusta is forced last in the following round when it ends movement on top.
-- Augusta does not trigger when it does not end movement on top.
+- Augusta skips the current round and is forced last in the following round when it starts the round on top.
+- Augusta does not trigger when it starts the round unentered or not on top.
 - Iuno teleports adjacent ranked normal dangos to its own tile after passing midpoint.
 - Iuno preserves pre-teleport ranking order for teleported dangos.
 - Iuno includes Bu King when finding adjacent ranked entries but never selects Bu King.
 - Iuno triggers when carried through the midpoint.
 - Phrolova gains 3 movement when at stack bottom.
+- Phrolova gains 3 movement when alone in its stack.
 - Phrolova does not gain movement when unentered or not at bottom.
 - Changli can mark itself last next round when dango exist below it.
 - Changli does not mark itself when no dango is below it.
-- Jinhsi can move to top before movement when dango exist above it.
-- Jinhsi does not move to top when the probability check fails.
+- Jinhsi can move to top at the start of its own turn when dango exist above it.
+- Jinhsi does not move to top when the turn-start probability check fails.
 - Calcharo gains 3 movement when current ranking places it last among normal dangos.
 - Calcharo ignores Bu King when determining last place.
 
@@ -156,5 +164,8 @@ uv run pytest
 - The ambiguous Iuno phrase has been resolved as "teleport selected ranked neighbors to Iuno's own tile."
 - Iuno's neighbor calculation now includes Bu King in ranking context while excluding Bu King from selected teleport targets.
 - Calcharo uses ranking position, not track position.
-- Augusta and Changli both check after their own movement and can mark themselves last for the next round.
+- Augusta checks at round start, skips that round, and marks itself last for the next round.
+- Phrolova alone in a stack counts as bottom.
+- Changli checks after its own movement and can mark itself last for the next round.
+- Jinhsi checks at the start of its own turn before movement.
 - The design keeps the current hook architecture and avoids a full event bus.
