@@ -41,6 +41,38 @@ def test_normal_dango_reaching_finish_ends_race_immediately():
     assert result.rounds == 1
 
 
+def test_normal_dango_finishes_when_forward_path_passes_start():
+    config = RaceConfig(
+        board=Board(finish=5),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {3: ["a"], 1: ["b"]}
+
+    engine.take_turn("a", base_roll=2, round_rolls={"a": 2, "b": 1})
+
+    assert engine.has_finished()
+    assert engine.state.finished_group == ["a"]
+    assert engine.rankings() == ["a", "b"]
+
+
+def test_normal_dango_wraps_without_finishing_when_start_not_passed():
+    config = RaceConfig(
+        board=Board(finish=5),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {1: ["a"], 3: ["b"]}
+
+    engine.take_turn("a", base_roll=2, round_rolls={"a": 2, "b": 1})
+
+    assert not engine.has_finished()
+    assert engine.state.positions == {3: ["b", "a"]}
+    assert engine.rankings() == ["b", "a"]
+
+
 def test_lower_dango_carries_dango_above_it():
     config = RaceConfig(
         board=Board(finish=10),
@@ -78,7 +110,23 @@ def test_moving_group_lands_on_top_of_destination_stack():
     assert engine.state.stack_at(2) == ["c", "a", "b"]
 
 
-def test_ranking_uses_nearest_to_finish_then_top_to_bottom():
+def test_ranking_uses_forward_distance_to_start_and_top_to_bottom():
+    config = RaceConfig(
+        board=Board(finish=8),
+        participants=[
+            Dango(id="a", name="A"),
+            Dango(id="b", name="B"),
+            Dango(id="c", name="C"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {6: ["a"], 7: ["b", "c"], 2: []}
+
+    assert engine.rankings() == ["c", "b", "a"]
+
+
+def test_ranking_uses_nearest_to_start_then_top_to_bottom():
     config = RaceConfig(
         board=Board(finish=10),
         participants=[
@@ -94,7 +142,7 @@ def test_ranking_uses_nearest_to_finish_then_top_to_bottom():
     assert engine.rankings() == ["c", "b", "a"]
 
 
-def test_ranking_uses_top_to_bottom_for_finished_stacks():
+def test_ranking_uses_recorded_finished_group_before_remaining_dangos():
     config = RaceConfig(
         board=Board(finish=10),
         participants=[
@@ -105,7 +153,9 @@ def test_ranking_uses_top_to_bottom_for_finished_stacks():
         include_bu_king=False,
     )
     engine = RaceEngine(config, rng=FixedRng([]))
-    engine.state = RaceState(positions={10: ["b", "c"], 4: ["a"]})
+    engine.state = RaceState(positions={0: ["b", "c"], 4: ["a"]})
+    engine.state.finished_group = ["c", "b"]
+    engine.state.finished_position = 0
 
     assert engine.rankings() == ["c", "b", "a"]
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable
 
 from dango_sim.models import BU_KING_ID, Dango, RaceConfig, RaceResult, RaceState
@@ -13,6 +13,8 @@ class TurnContext:
     round_rolls: dict[str, int]
     base_roll: int
     movement: int
+    path: list[int] = field(default_factory=list)
+    group: list[str] = field(default_factory=list)
     blocked: bool = False
 
 
@@ -25,6 +27,8 @@ class RaceEngine:
         self.dangos: dict[str, Dango] = {
             dango.id: dango for dango in self.participants
         }
+        self._last_moved_group: list[str] = []
+        self._last_moved_destination: int | None = None
         self.state = RaceState.initial(self.normal_ids())
         if self.config.include_bu_king:
             self.dangos[BU_KING_ID] = Dango(
@@ -137,19 +141,46 @@ class RaceEngine:
 
         source = self.state.position_of(dango_id)
         group = self.state.lift_group_from(dango_id)
-        destination = source + context.movement
-        if destination >= self.config.board.finish:
-            self.state.place_group(group, destination)
+        path = self.forward_path(source, context.movement)
+        context.group = list(group)
+        context.path = list(path)
+        if self.path_passes_start(path):
+            self.state.finished_group = list(reversed(group))
+            self.state.finished_position = 0
+            self.state.place_group(group, 0)
+            self._last_moved_group = list(group)
+            self._last_moved_destination = 0
+            self.after_any_move(group, path, dango_id)
             return
-        self.move_group_to(group, destination)
+        self.move_group_to(group, path[-1], actor_id=dango_id, path=path)
 
         if dango.skill and hasattr(dango.skill, "after_move"):
             dango.skill.after_move(dango, self.state, context, self.rng, self)
 
-    def move_group_to(self, group: list[str], destination: int) -> None:
+    def move_group_to(
+        self,
+        group: list[str],
+        destination: int,
+        *,
+        actor_id: str | None = None,
+        path: list[int] | None = None,
+        bottom: bool = False,
+    ) -> None:
+        destination = self.normalize_position(destination)
         self.state.remove_ids(group)
-        self.state.place_group(group, destination)
+        self.state.place_group(group, destination, bottom=bottom)
+        self._last_moved_group = list(group)
+        self._last_moved_destination = destination
         self.resolve_tiles(group, destination)
+        self.after_any_move(group, path or [destination], actor_id)
+
+    def after_any_move(
+        self,
+        group: list[str],
+        path: list[int],
+        actor_id: str | None,
+    ) -> None:
+        return None
 
     def take_bu_king_turn(self) -> None:
         if not self.config.include_bu_king or self.state.round_number < 3:
@@ -215,27 +246,16 @@ class RaceEngine:
         raise RuntimeError("tile resolution exceeded maximum depth")
 
     def has_finished(self) -> bool:
-        for dango_id in self.normal_ids():
-            if self.state.position_of(dango_id) >= self.config.board.finish:
-                return True
-        return False
+        return self.state.finished_group is not None
 
     def rankings(self) -> list[str]:
         normal_ids = set(self.normal_ids())
         ordered: list[str] = []
 
-        finish_positions = sorted(
-            [
-                position
-                for position in self.state.positions
-                if position >= self.config.board.finish
-            ],
-            reverse=True,
-        )
-        for position in finish_positions:
+        if self.state.finished_group is not None:
             ordered.extend(
                 dango_id
-                for dango_id in reversed(self.state.stack_at(position))
+                for dango_id in self.state.finished_group
                 if dango_id in normal_ids
             )
 
@@ -243,15 +263,31 @@ class RaceEngine:
             [
                 position
                 for position in self.state.positions
-                if position < self.config.board.finish
             ],
-            reverse=True,
+            key=lambda position: self.forward_distance_to_start(position),
         )
         for position in remaining_positions:
             ordered.extend(
                 dango_id
-                for dango_id in reversed(self.state.stack_at(position))
+                for dango_id in self.ranking_stack_at(position)
                 if dango_id in normal_ids and dango_id not in ordered
             )
 
         return ordered
+
+    def ranking_stack_at(self, position: int) -> list[str]:
+        stack = self.state.stack_at(position)
+        if (
+            self._last_moved_destination == position
+            and self._last_moved_group
+            and stack[-len(self._last_moved_group) :] == self._last_moved_group
+        ):
+            existing = stack[: -len(self._last_moved_group)]
+            return list(reversed(existing)) + list(reversed(self._last_moved_group))
+        return list(reversed(stack))
+
+    def forward_distance_to_start(self, position: int) -> int:
+        normalized = self.normalize_position(position)
+        if normalized == 0:
+            return self.config.board.finish
+        return self.config.board.finish - normalized
