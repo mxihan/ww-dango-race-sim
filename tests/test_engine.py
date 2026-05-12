@@ -234,12 +234,56 @@ def test_engine_resolves_tile_chaining():
         board=Board(finish=10, tiles={2: Booster(), 3: Booster()}),
         participants=[Dango(id="a", name="A")],
         include_bu_king=False,
+        tile_resolution="chain",
     )
     engine = RaceEngine(config, rng=FixedRng([2]))
 
     engine.take_turn("a")
 
     assert engine.state.stack_at(4) == ["a"]
+
+
+def test_single_tile_resolution_does_not_chain_by_default():
+    config = RaceConfig(
+        board=Board(finish=8, tiles={2: Booster(), 3: Booster()}),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {1: ["a"]}
+
+    engine.take_turn("a", base_roll=1, round_rolls={"a": 1})
+
+    assert engine.state.position_of("a") == 3
+
+
+def test_chain_tile_resolution_remains_opt_in():
+    config = RaceConfig(
+        board=Board(finish=8, tiles={2: Booster(), 3: Booster()}),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+        tile_resolution="chain",
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {1: ["a"]}
+
+    engine.take_turn("a", base_roll=1, round_rolls={"a": 1})
+
+    assert engine.state.position_of("a") == 4
+
+
+def test_chain_tile_resolution_wraps_tile_movement():
+    config = RaceConfig(
+        board=Board(finish=5, tiles={4: Booster()}),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {3: ["a"]}
+
+    engine.take_turn("a", base_roll=1, round_rolls={"a": 1})
+
+    assert engine.has_finished()
 
 
 def test_booster_tile_finishes_when_forward_path_passes_start():
@@ -281,6 +325,7 @@ def test_engine_allows_tile_chain_to_end_at_max_depth():
         participants=[Dango(id="a", name="A")],
         include_bu_king=False,
         max_tile_depth=2,
+        tile_resolution="chain",
     )
     engine = RaceEngine(config, rng=FixedRng([2]))
 
@@ -295,6 +340,7 @@ def test_engine_stops_infinite_tile_loop():
         participants=[Dango(id="a", name="A")],
         include_bu_king=False,
         max_tile_depth=3,
+        tile_resolution="chain",
     )
     engine = RaceEngine(config, rng=FixedRng([2]))
 

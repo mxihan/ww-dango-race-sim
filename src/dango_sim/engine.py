@@ -221,33 +221,62 @@ class RaceEngine:
         self.state.place_group([BU_KING_ID], self.config.board.finish)
 
     def resolve_tiles(self, group: list[str], position: int) -> None:
+        if self.config.tile_resolution == "single":
+            self.resolve_single_tile(group, position)
+            return
+
+        self.resolve_chained_tiles(group, position)
+
+    def resolve_single_tile(self, group: list[str], position: int) -> None:
+        current = self.normalize_position(position)
+        tile = self.config.board.tiles.get(current)
+        if tile is None:
+            return
+
+        next_position = tile.on_landed(group, current, self.state, self.rng)
+        self.apply_tile_movement(group, current, next_position)
+
+    def resolve_chained_tiles(self, group: list[str], position: int) -> None:
         current = position
         for _ in range(self.config.max_tile_depth):
+            current = self.normalize_position(current)
             tile = self.config.board.tiles.get(current)
             if tile is None:
                 return
 
             next_position = tile.on_landed(group, current, self.state, self.rng)
-            if next_position == current:
+            moved_position = self.apply_tile_movement(group, current, next_position)
+            if moved_position == current or self.has_finished():
                 return
 
-            steps = next_position - current
-            path = self.forward_path(current, steps) if steps > 0 else []
-            if self.path_passes_start(path):
-                self.state.remove_ids(group)
-                self.state.finished_group = list(reversed(group))
-                self.state.finished_position = 0
-                self.state.place_group(group, 0)
-                return
-
-            next_position = self.normalize_position(next_position)
-            self.state.remove_ids(group)
-            self.state.place_group(group, next_position)
-            current = next_position
+            current = moved_position
 
         if self.config.board.tiles.get(current) is None:
             return
         raise RuntimeError("tile resolution exceeded maximum depth")
+
+    def apply_tile_movement(
+        self,
+        group: list[str],
+        current: int,
+        next_position: int,
+    ) -> int:
+        if next_position == current:
+            return current
+
+        steps = next_position - current
+        path = self.forward_path(current, steps) if steps > 0 else []
+        if self.path_passes_start(path):
+            self.state.remove_ids(group)
+            self.state.finished_group = list(reversed(group))
+            self.state.finished_position = 0
+            self.state.place_group(group, 0)
+            return 0
+
+        normalized_position = self.normalize_position(next_position)
+        self.state.remove_ids(group)
+        self.state.place_group(group, normalized_position)
+        return normalized_position
 
     def has_finished(self) -> bool:
         return self.state.finished_group is not None
