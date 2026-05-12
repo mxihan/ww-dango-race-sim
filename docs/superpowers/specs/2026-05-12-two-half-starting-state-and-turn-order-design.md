@@ -125,8 +125,9 @@ Movement-modifier skills:
 
 Chisa:
 
-- Chisa's minimum-roll check uses the complete `round_move_rolls` for normal dango in the round.
-- The check excludes Bu King.
+- Chisa's minimum-roll check uses the complete `round_move_rolls` pool for the round.
+- Before Bu King is allowed to act, the pool contains normal dango only.
+- From round 3 onward, when Bu King is allowed to act and has a movement roll, Bu King's movement roll is included in Chisa's minimum-roll check.
 - The check uses base movement roll results after dice-phase skills and before movement modifiers.
 - Chisa's own `+2` bonus is not included in the pool used to decide whether Chisa qualifies.
 
@@ -216,7 +217,7 @@ Add focused tests for:
 - Equal order-roll groups being shuffled only within the same roll value.
 - Mornye/Shorekeeper triggering during both order and movement pre-roll phases.
 - Movement modifiers not affecting order rolls.
-- Chisa reading complete normal-dango `round_move_rolls`, excluding Bu King and movement modifiers.
+- Chisa reading the complete `round_move_rolls` pool, including Bu King only from the rounds where Bu King is allowed to act, and excluding movement modifiers.
 - No starting state creates no starting stack and enters dango on first action.
 - Unentered dango are ignored by Aemeath, Bu King, ranking, and board stack interactions.
 - Starting-state JSON round-trip and validation.
