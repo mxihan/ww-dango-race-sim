@@ -27,6 +27,9 @@ class RaceEngine:
         self.dangos: dict[str, Dango] = {
             dango.id: dango for dango in self.participants
         }
+        self.skip_turns_this_round: set[str] = set()
+        self.force_last_next_round_ids: set[str] = set()
+        self.force_last_this_round_ids: set[str] = set()
         if self.config.starting_state is None:
             self.state = RaceState.empty(self.normal_ids())
         else:
@@ -43,13 +46,24 @@ class RaceEngine:
     def run(self) -> RaceResult:
         for round_number in range(1, self.config.max_rounds + 1):
             self.state.round_number = round_number
-            actors = self.actors_for_round(round_number)
-            order = self.build_round_order(round_number)
+            self.start_round(round_number)
+            actors = [
+                actor_id
+                for actor_id in self.actors_for_round(round_number)
+                if actor_id not in self.skip_turns_this_round
+            ]
+            self._round_order_actors = actors
+            try:
+                order = self.build_round_order(round_number)
+            finally:
+                del self._round_order_actors
             round_rolls = self.roll_round_values(actors)
 
             for dango_id in order:
                 if self.has_finished():
                     break
+                if dango_id in self.skip_turns_this_round:
+                    continue
                 if dango_id == BU_KING_ID:
                     self.take_bu_king_turn(base_roll=round_rolls[dango_id])
                 else:
@@ -76,17 +90,58 @@ class RaceEngine:
             dango.id for dango in self.participants if not dango.is_special
         ]
 
+    def start_round(self, round_number: int) -> None:
+        self.force_last_this_round_ids = set(self.force_last_next_round_ids)
+        self.force_last_next_round_ids.clear()
+        self.skip_turns_this_round.clear()
+        for dango in self.participants:
+            if dango.skill and hasattr(dango.skill, "on_round_start"):
+                dango.skill.on_round_start(dango, self.state, self, self.rng)
+
+    def force_last_next_round(self, dango_id: str) -> None:
+        if dango_id in self.normal_ids():
+            self.force_last_next_round_ids.add(dango_id)
+
+    def skip_turn_this_round(self, dango_id: str) -> None:
+        if dango_id in self.normal_ids():
+            self.skip_turns_this_round.add(dango_id)
+
+    def apply_forced_last(self, order: list[str]) -> list[str]:
+        forced = [
+            dango_id
+            for dango_id in order
+            if dango_id in self.force_last_this_round_ids
+        ]
+        normal = [
+            dango_id
+            for dango_id in order
+            if dango_id not in self.force_last_this_round_ids
+        ]
+        return normal + forced
+
     def actors_for_round(self, round_number: int) -> list[str]:
         actors = self.normal_ids()
         if self.config.include_bu_king and round_number >= 3:
             actors.append(BU_KING_ID)
         return actors
 
-    def build_round_order(self, round_number: int) -> list[str]:
-        return self.order_actors(
-            self.roll_order_values(
+    def build_round_order(
+        self,
+        round_number: int,
+        actors: Iterable[str] | None = None,
+    ) -> list[str]:
+        if actors is None:
+            actors = getattr(
+                self,
+                "_round_order_actors",
                 self.actors_for_round(round_number),
-                round_number=round_number,
+            )
+        return self.apply_forced_last(
+            self.order_actors(
+                self.roll_order_values(
+                    actors,
+                    round_number=round_number,
+                )
             )
         )
 
@@ -172,6 +227,8 @@ class RaceEngine:
         base_roll: int | None = None,
         round_rolls: dict[str, int] | None = None,
     ) -> None:
+        if dango_id in self.skip_turns_this_round:
+            return
         if base_roll is None:
             base_roll = self.roll_for(dango_id)
 
@@ -181,6 +238,10 @@ class RaceEngine:
             movement=base_roll,
         )
         dango = self.dangos[dango_id]
+        if dango.skill and hasattr(dango.skill, "on_turn_start"):
+            dango.skill.on_turn_start(dango, self.state, context, self.rng, self)
+            if dango_id in self.skip_turns_this_round:
+                return
         if dango.skill and hasattr(dango.skill, "modify_roll"):
             context.movement = int(
                 dango.skill.modify_roll(

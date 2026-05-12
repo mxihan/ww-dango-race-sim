@@ -2,6 +2,7 @@ from dango_sim.engine import RaceEngine, TurnContext
 from dango_sim.models import BU_KING_ID, Board, Dango, RaceConfig, RaceState
 from dango_sim.skills import (
     AemeathSkill,
+    AugustaSkill,
     CarlottaSkill,
     LynaeSkill,
     MornyeSkill,
@@ -23,6 +24,28 @@ class FixedRng:
 
     def random(self):
         return self.randoms.pop(0)
+
+
+class AlwaysSkipRoundStartSkill:
+    def on_round_start(self, dango, state, engine, rng) -> None:
+        engine.skip_turn_this_round(dango.id)
+
+
+class StatefulSkipRoundStartSkill:
+    def __init__(self):
+        self.index = 0
+
+    def on_round_start(self, dango, state, engine, rng) -> None:
+        engine.skip_turn_this_round(dango.id)
+
+    def roll(self, dango, state, rng) -> int:
+        self.index += 1
+        return 1
+
+
+class SkipOnTurnStartSkill:
+    def on_turn_start(self, dango, state, context, rng, engine) -> None:
+        engine.skip_turn_this_round(dango.id)
 
 
 def test_carlotta_doubles_roll_when_probability_triggers():
@@ -401,3 +424,105 @@ def test_chisa_minimum_check_includes_bu_king_once_bu_king_can_act():
         context,
         engine.rng,
     ) == 2
+
+
+def test_augusta_skips_current_round_when_round_starts_on_top():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="base", name="Base"),
+            Dango(id="augusta", name="Augusta", skill=AugustaSkill()),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng(choices=[3, 1, 1, 1]))
+    engine.state = RaceState(positions={2: ["base", "augusta"]})
+    engine.state.round_number = 1
+    engine.start_round(1)
+
+    order = engine.build_round_order(1)
+    round_rolls = {"base": 1, "augusta": 3}
+    for dango_id in order:
+        engine.take_turn(dango_id, base_roll=round_rolls[dango_id], round_rolls=round_rolls)
+
+    assert engine.state.stack_at(2) == []
+    assert engine.state.stack_at(3) == ["base", "augusta"]
+    assert engine.force_last_next_round_ids == {"augusta"}
+
+
+def test_augusta_forced_last_marker_moves_it_to_next_round_end():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="base", name="Base"),
+            Dango(id="augusta", name="Augusta", skill=AugustaSkill()),
+            Dango(id="other", name="Other"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng(choices=[3, 1, 2, 1, 3, 2]))
+    engine.force_last_next_round_ids.add("augusta")
+    engine.start_round(2)
+
+    assert engine.build_round_order(2)[-1] == "augusta"
+    assert engine.force_last_next_round_ids == set()
+
+
+def test_run_loop_skips_dango_marked_to_skip_this_round():
+    class RunLoopSkipProbeEngine(RaceEngine):
+        def take_turn(self, dango_id, *, base_roll=None, round_rolls=None):
+            if dango_id == "skipped":
+                raise AssertionError("run loop should skip this dango before take_turn")
+            return super().take_turn(
+                dango_id,
+                base_roll=base_roll,
+                round_rolls=round_rolls,
+            )
+
+    config = RaceConfig(
+        board=Board(finish=1),
+        participants=[
+            Dango(id="skipped", name="Skipped", skill=AlwaysSkipRoundStartSkill()),
+            Dango(id="winner", name="Winner"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RunLoopSkipProbeEngine(config, rng=FixedRng(choices=[3, 1, 1, 1]))
+
+    result = engine.run()
+
+    assert result.winner_id == "winner"
+    assert "skipped" not in engine.state.finished_group
+
+
+def test_run_loop_does_not_roll_skipped_stateful_skill():
+    skill = StatefulSkipRoundStartSkill()
+    config = RaceConfig(
+        board=Board(finish=1),
+        participants=[
+            Dango(id="skipped", name="Skipped", skill=skill),
+            Dango(id="winner", name="Winner"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng(choices=[1, 1]))
+
+    result = engine.run()
+
+    assert result.winner_id == "winner"
+    assert engine.dangos["skipped"].skill.index == 0
+
+
+def test_on_turn_start_can_skip_before_movement():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="skipped", name="Skipped", skill=SkipOnTurnStartSkill()),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+
+    engine.take_turn("skipped", base_roll=3, round_rolls={"skipped": 3})
+
+    assert engine.state.positions == {}

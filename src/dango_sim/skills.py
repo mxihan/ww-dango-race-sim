@@ -52,6 +52,18 @@ class ShorekeeperSkill:
 
 
 @dataclass
+class AugustaSkill:
+    def on_round_start(self, dango: Dango, state: RaceState, engine, rng) -> None:
+        if not state.is_entered(dango.id):
+            return
+        position = state.position_of(dango.id)
+        stack = state.stack_at(position)
+        if stack and stack[-1] == dango.id:
+            engine.skip_turn_this_round(dango.id)
+            engine.force_last_next_round(dango.id)
+
+
+@dataclass
 class AemeathSkill:
     used: bool = False
     consume_on_fail: bool = False
