@@ -132,29 +132,22 @@ def test_shorekeeper_faces_are_two_and_three():
     ) == [2, 3]
 
 
-def test_aemeath_teleports_once_to_nearest_dango_ahead():
+def test_aemeath_triggers_when_movement_path_passes_midpoint():
     config = RaceConfig(
         board=Board(finish=10),
         participants=[
             Dango(id="aemeath", name="Aemeath", skill=AemeathSkill()),
-            Dango(id="near", name="Near"),
-            Dango(id="far", name="Far"),
+            Dango(id="target", name="Target"),
         ],
         include_bu_king=False,
     )
     engine = RaceEngine(config, rng=FixedRng())
-    engine.state = RaceState(positions={5: ["aemeath"], 7: ["near"], 9: ["far"]})
-    context = TurnContext(round_rolls={"aemeath": 3}, base_roll=3, movement=3)
+    engine.state = RaceState(positions={4: ["aemeath"], 8: ["target"]})
 
-    config.participants[0].skill.after_move(
-        config.participants[0],
-        engine.state,
-        context,
-        FixedRng(),
-        engine,
-    )
+    engine.take_turn("aemeath", base_roll=2, round_rolls={"aemeath": 2, "target": 1})
 
-    assert engine.state.stack_at(7) == ["near", "aemeath"]
+    assert engine.dangos["aemeath"].skill.used is True
+    assert engine.state.stack_at(8) == ["target", "aemeath"]
 
 
 def test_aemeath_teleports_only_itself_not_dango_above_it():
@@ -169,19 +162,13 @@ def test_aemeath_teleports_only_itself_not_dango_above_it():
         include_bu_king=False,
     )
     engine = RaceEngine(config, rng=FixedRng())
-    engine.state = RaceState(positions={5: ["lower", "aemeath", "rider"], 7: ["target"]})
-    context = TurnContext(round_rolls={"aemeath": 3}, base_roll=3, movement=3)
+    engine.state = RaceState(positions={4: ["lower", "aemeath", "rider"], 8: ["target"]})
 
-    engine.dangos["aemeath"].skill.after_move(
-        engine.dangos["aemeath"],
-        engine.state,
-        context,
-        FixedRng(),
-        engine,
-    )
+    engine.take_turn("aemeath", base_roll=1, round_rolls={"aemeath": 1, "target": 1})
 
-    assert engine.state.stack_at(5) == ["lower", "rider"]
-    assert engine.state.stack_at(7) == ["target", "aemeath"]
+    assert engine.state.stack_at(4) == ["lower"]
+    assert engine.state.stack_at(5) == ["rider"]
+    assert engine.state.stack_at(8) == ["target", "aemeath"]
 
 
 def test_aemeath_ignores_bu_king_only_stack_when_teleporting():
@@ -191,21 +178,13 @@ def test_aemeath_ignores_bu_king_only_stack_when_teleporting():
             Dango(id="aemeath", name="Aemeath", skill=AemeathSkill()),
             Dango(id="target", name="Target"),
         ],
-        include_bu_king=False,
     )
     engine = RaceEngine(config, rng=FixedRng())
     engine.state = RaceState(
-        positions={5: ["aemeath"], 6: [BU_KING_ID], 8: ["target"]}
+        positions={4: ["aemeath"], 6: [BU_KING_ID], 8: ["target"]}
     )
-    context = TurnContext(round_rolls={"aemeath": 3}, base_roll=3, movement=3)
 
-    config.participants[0].skill.after_move(
-        config.participants[0],
-        engine.state,
-        context,
-        FixedRng(),
-        engine,
-    )
+    engine.take_turn("aemeath", base_roll=2, round_rolls={"aemeath": 2, "target": 1})
 
     assert engine.state.stack_at(6) == [BU_KING_ID]
     assert engine.state.stack_at(8) == ["target", "aemeath"]
@@ -222,25 +201,19 @@ def test_aemeath_skill_state_is_local_to_each_engine():
     )
 
     first_engine = RaceEngine(config, rng=FixedRng())
-    first_engine.state = RaceState(positions={5: ["aemeath"], 7: ["target"]})
-    first_context = TurnContext(round_rolls={"aemeath": 3}, base_roll=3, movement=3)
-    first_engine.dangos["aemeath"].skill.after_move(
-        first_engine.dangos["aemeath"],
-        first_engine.state,
-        first_context,
-        FixedRng(),
-        first_engine,
+    first_engine.state = RaceState(positions={4: ["aemeath"], 7: ["target"]})
+    first_engine.take_turn(
+        "aemeath",
+        base_roll=1,
+        round_rolls={"aemeath": 1, "target": 1},
     )
 
     second_engine = RaceEngine(config, rng=FixedRng())
-    second_engine.state = RaceState(positions={5: ["aemeath"], 7: ["target"]})
-    second_context = TurnContext(round_rolls={"aemeath": 3}, base_roll=3, movement=3)
-    second_engine.dangos["aemeath"].skill.after_move(
-        second_engine.dangos["aemeath"],
-        second_engine.state,
-        second_context,
-        FixedRng(),
-        second_engine,
+    second_engine.state = RaceState(positions={4: ["aemeath"], 7: ["target"]})
+    second_engine.take_turn(
+        "aemeath",
+        base_roll=1,
+        round_rolls={"aemeath": 1, "target": 1},
     )
 
     assert first_engine.state.stack_at(7) == ["target", "aemeath"]
@@ -248,8 +221,7 @@ def test_aemeath_skill_state_is_local_to_each_engine():
     assert config.participants[0].skill.used is False
 
 
-def test_aemeath_preserves_skill_when_no_target_ahead():
-    """By default, Aemeath keeps its skill if no valid target is found."""
+def test_aemeath_waits_when_no_target_after_midpoint():
     skill = AemeathSkill()
     config = RaceConfig(
         board=Board(finish=10),
@@ -257,18 +229,75 @@ def test_aemeath_preserves_skill_when_no_target_ahead():
         include_bu_king=False,
     )
     engine = RaceEngine(config, rng=FixedRng())
-    engine.state = RaceState(positions={6: ["aemeath"]})
-    context = TurnContext(round_rolls={"aemeath": 1}, base_roll=1, movement=1)
+    engine.state = RaceState(positions={4: ["aemeath"]})
 
-    skill.after_move(
-        engine.dangos["aemeath"],
-        engine.state,
-        context,
-        FixedRng(),
-        engine,
+    engine.take_turn(
+        "aemeath",
+        base_roll=2,
+        round_rolls={"aemeath": 2},
     )
 
-    assert skill.used is False
+    engine_skill = engine.dangos["aemeath"].skill
+    assert engine_skill.used is False
+    assert engine_skill.waiting is True
+
+
+def test_aemeath_waiting_rechecks_after_any_move():
+    skill = AemeathSkill()
+    config = RaceConfig(
+        board=Board(finish=12),
+        participants=[
+            Dango(id="aemeath", name="Aemeath", skill=skill),
+            Dango(id="target", name="Target"),
+            Dango(id="other", name="Other"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={5: ["aemeath"], 2: ["target"], 1: ["other"]})
+
+    engine.take_turn(
+        "aemeath",
+        base_roll=1,
+        round_rolls={"aemeath": 1, "target": 1, "other": 1},
+    )
+    engine_skill = engine.dangos["aemeath"].skill
+    assert engine_skill.waiting is True
+
+    engine.take_turn(
+        "target",
+        base_roll=5,
+        round_rolls={"aemeath": 1, "target": 5, "other": 1},
+    )
+
+    assert engine_skill.used is True
+    assert engine_skill.waiting is False
+    assert engine.state.stack_at(7) == ["target", "aemeath"]
+
+
+def test_aemeath_triggers_when_carried_through_midpoint():
+    skill = AemeathSkill()
+    config = RaceConfig(
+        board=Board(finish=12),
+        participants=[
+            Dango(id="carrier", name="Carrier"),
+            Dango(id="aemeath", name="Aemeath", skill=skill),
+            Dango(id="target", name="Target"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={5: ["carrier", "aemeath"], 8: ["target"]})
+
+    engine.take_turn(
+        "carrier",
+        base_roll=1,
+        round_rolls={"carrier": 1, "aemeath": 1, "target": 1},
+    )
+
+    assert engine.dangos["aemeath"].skill.used is True
+    assert engine.state.stack_at(6) == ["carrier"]
+    assert engine.state.stack_at(8) == ["target", "aemeath"]
 
 
 def test_aemeath_consumes_skill_on_fail_when_configured():
@@ -280,15 +309,14 @@ def test_aemeath_consumes_skill_on_fail_when_configured():
         include_bu_king=False,
     )
     engine = RaceEngine(config, rng=FixedRng())
-    engine.state = RaceState(positions={6: ["aemeath"]})
-    context = TurnContext(round_rolls={"aemeath": 1}, base_roll=1, movement=1)
+    engine.state = RaceState(positions={4: ["aemeath"]})
 
-    skill.after_move(
-        engine.dangos["aemeath"],
-        engine.state,
-        context,
-        FixedRng(),
-        engine,
+    engine.take_turn(
+        "aemeath",
+        base_roll=2,
+        round_rolls={"aemeath": 2},
     )
 
-    assert skill.used is True
+    engine_skill = engine.dangos["aemeath"].skill
+    assert engine_skill.used is True
+    assert engine_skill.waiting is False

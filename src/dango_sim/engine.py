@@ -178,7 +178,16 @@ class RaceEngine:
         path: list[int],
         actor_id: str | None,
     ) -> None:
-        return None
+        context = TurnContext(
+            round_rolls={},
+            base_roll=0,
+            movement=0,
+            path=list(path),
+            group=list(group),
+        )
+        for dango in self.participants:
+            if dango.skill and hasattr(dango.skill, "after_any_move"):
+                dango.skill.after_any_move(dango, self.state, context, self.rng, self)
 
     def bu_king_group(self) -> list[str]:
         position = self.state.position_of(BU_KING_ID)
@@ -336,3 +345,22 @@ class RaceEngine:
 
     def forward_distance_to_start(self, position: int) -> int:
         return (self.config.board.finish - position) % self.config.board.finish
+
+    def nearest_normal_dango_ahead(
+        self,
+        position: int,
+        *,
+        exclude_id: str | None = None,
+    ) -> tuple[int, str] | None:
+        normal_ids = set(self.normal_ids())
+        if exclude_id is not None:
+            normal_ids.discard(exclude_id)
+
+        current = self.normalize_position(position)
+        while True:
+            current = self.next_position(current)
+            if current == 0:
+                return None
+            for dango_id in reversed(self.state.stack_at(current)):
+                if dango_id in normal_ids:
+                    return current, dango_id

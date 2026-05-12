@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dango_sim.models import BU_KING_ID, Dango, RaceState
+from dango_sim.models import Dango, RaceState
 
 
 @dataclass
@@ -55,32 +55,49 @@ class ShorekeeperSkill:
 class AemeathSkill:
     used: bool = False
     consume_on_fail: bool = False
+    waiting: bool = False
+    midpoint: int | None = None
 
     def after_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+        self._handle_move_path(dango, state, context, engine)
+
+    def after_any_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+        self._handle_move_path(dango, state, context, engine)
+        if self.used or not self.waiting:
+            return
+        self.try_teleport(dango, state, engine, enter_wait=False)
+
+    def _handle_move_path(self, dango: Dango, state: RaceState, context, engine) -> None:
+        if self.used:
+            return
+
+        group = getattr(context, "group", [])
+        if dango.id not in group:
+            return
+
+        path = getattr(context, "path", [])
+        midpoint = self.midpoint if self.midpoint is not None else engine.config.board.finish // 2
+        if midpoint not in path:
+            return
+
+        self.try_teleport(dango, state, engine, enter_wait=True)
+
+    def try_teleport(self, dango: Dango, state: RaceState, engine, *, enter_wait: bool) -> None:
         if self.used:
             return
 
         position = state.position_of(dango.id)
-        midpoint = engine.config.board.finish / 2
-        if position < midpoint:
-            return
-
-        candidates = []
-        for candidate_position, stack in state.positions.items():
-            if candidate_position <= position:
-                continue
-            if any(candidate_id != BU_KING_ID for candidate_id in stack):
-                candidates.append(candidate_position)
-        if not candidates:
+        target = engine.nearest_normal_dango_ahead(position, exclude_id=dango.id)
+        if target is None:
             if self.consume_on_fail:
                 self.used = True
+                self.waiting = False
+            elif enter_wait:
+                self.waiting = True
             return
 
-        target = min(candidates)
-        source = state.position_of(dango.id)
-        source_stack = state.positions[source]
-        source_stack.remove(dango.id)
-        if not source_stack:
-            del state.positions[source]
-        state.place_group([dango.id], target)
+        target_position, _target_id = target
+        state.remove_ids([dango.id])
+        state.place_group([dango.id], target_position)
         self.used = True
+        self.waiting = False
