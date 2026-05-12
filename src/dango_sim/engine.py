@@ -205,9 +205,7 @@ class RaceEngine:
         context.group = list(group)
         context.path = list(path)
         if self.path_passes_start(path):
-            self.state.finished_group = list(reversed(group))
-            self.state.finished_position = 0
-            self.state.place_group(group, 0)
+            self.finish_group_at_start(group)
             self.after_any_move(group, path, dango_id)
             return
         self.move_group_to(group, path[-1], actor_id=dango_id, path=path)
@@ -360,10 +358,7 @@ class RaceEngine:
         steps = next_position - current
         path = self.forward_path(current, steps) if steps > 0 else []
         if self.path_passes_start(path):
-            self.state.remove_ids(group)
-            self.state.finished_group = list(reversed(group))
-            self.state.finished_position = 0
-            self.state.place_group(group, 0)
+            self.finish_group_at_start(group)
             return 0
 
         normalized_position = self.normalize_position(next_position)
@@ -407,6 +402,30 @@ class RaceEngine:
             ordered.extend(unentered)
 
         return ordered
+
+    def win_lap_threshold(self) -> int:
+        return 2 if self.config.starting_state is not None else 1
+
+    def finish_group_at_start(self, group: list[str]) -> None:
+        normal_ids = set(self.normal_ids())
+        self.state.remove_ids(group)
+        self.state.place_group(group, 0)
+        for dango_id in group:
+            if dango_id in normal_ids:
+                self.state.laps_completed[dango_id] = (
+                    self.state.laps_completed.get(dango_id, 0) + 1
+                )
+
+        threshold = self.win_lap_threshold()
+        if any(
+            dango_id in normal_ids
+            and self.state.laps_completed.get(dango_id, 0) >= threshold
+            for dango_id in group
+        ):
+            self.state.finished_group = [
+                dango_id for dango_id in reversed(group) if dango_id in normal_ids
+            ]
+            self.state.finished_position = 0
 
     def forward_distance_to_start(self, position: int) -> int:
         return (self.config.board.finish - position) % self.config.board.finish

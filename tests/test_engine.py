@@ -709,3 +709,59 @@ def test_with_starting_state_preserves_initial_stacks_and_laps():
 
     assert engine.state.positions == {4: ["a", "b"]}
     assert engine.state.laps_completed == {"a": 1, "b": 0}
+
+
+def test_first_half_finish_increments_lap_and_places_group_at_zero():
+    config = RaceConfig(
+        board=Board(finish=5),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state = RaceState(
+        positions={4: ["a"], 2: ["b"]},
+        laps_completed={"a": 0, "b": 0},
+    )
+
+    engine.take_turn("a", base_roll=1, round_rolls={"a": 1, "b": 1})
+
+    assert engine.has_finished()
+    assert engine.state.positions[0] == ["a"]
+    assert engine.state.laps_completed["a"] == 1
+
+
+def test_second_half_dango_with_one_lap_needs_one_more_finish():
+    config = RaceConfig(
+        board=Board(finish=5),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+        starting_state=RaceStartingState(
+            positions={4: ["a"], 2: ["b"]},
+            laps_completed={"a": 1, "b": 0},
+        ),
+    )
+    engine = RaceEngine(config)
+
+    engine.take_turn("a", base_roll=1, round_rolls={"a": 1, "b": 1})
+
+    assert engine.has_finished()
+    assert engine.state.laps_completed["a"] == 2
+
+
+def test_second_half_dango_with_zero_laps_needs_two_finishes():
+    config = RaceConfig(
+        board=Board(finish=5),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+        starting_state=RaceStartingState(
+            positions={4: ["a"], 2: ["b"]},
+            laps_completed={"a": 0, "b": 1},
+        ),
+    )
+    engine = RaceEngine(config)
+
+    engine.take_turn("a", base_roll=1, round_rolls={"a": 1, "b": 1})
+
+    assert not engine.has_finished()
+    assert engine.state.laps_completed["a"] == 1
+    assert engine.state.positions[0] == ["a"]
