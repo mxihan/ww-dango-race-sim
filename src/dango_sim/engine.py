@@ -74,6 +74,24 @@ class RaceEngine:
             dango.id for dango in self.participants if not dango.is_special
         ]
 
+    def normalize_position(self, position: int) -> int:
+        return position % self.config.board.finish
+
+    def next_position(self, position: int, steps: int = 1) -> int:
+        return (position + steps) % self.config.board.finish
+
+    def previous_position(self, position: int, steps: int = 1) -> int:
+        return (position - steps) % self.config.board.finish
+
+    def forward_path(self, source: int, steps: int) -> list[int]:
+        return [self.next_position(source, step) for step in range(1, steps + 1)]
+
+    def backward_path(self, source: int, steps: int) -> list[int]:
+        return [self.previous_position(source, step) for step in range(1, steps + 1)]
+
+    def path_passes_start(self, path: list[int]) -> bool:
+        return 0 in path
+
     def roll_round_values(self, order: Iterable[str]) -> dict[str, int]:
         return {dango_id: self.roll_for(dango_id) for dango_id in order}
 

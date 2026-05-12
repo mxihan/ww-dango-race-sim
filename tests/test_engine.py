@@ -129,6 +129,29 @@ def test_round_rolls_are_materialized_before_first_turn():
     assert skill.observed_rolls == []
 
 
+def test_engine_forward_path_wraps_around_finish():
+    config = RaceConfig(
+        board=Board(finish=5),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+
+    assert engine.forward_path(3, 4) == [4, 0, 1, 2]
+    assert engine.path_passes_start(engine.forward_path(3, 4))
+
+
+def test_engine_backward_path_wraps_around_start():
+    config = RaceConfig(
+        board=Board(finish=5),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+
+    assert engine.backward_path(1, 3) == [0, 4, 3]
+
+
 def test_engine_resolves_tile_chaining():
     config = RaceConfig(
         board=Board(finish=10, tiles={2: Booster(), 3: Booster()}),
