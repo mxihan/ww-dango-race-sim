@@ -34,15 +34,12 @@ class RaceEngine:
                 name="Bu King",
                 is_special=True,
             )
-            self.state.place_group([BU_KING_ID], self.config.board.finish)
+            self.state.place_group([BU_KING_ID], 0, bottom=True)
 
     def run(self) -> RaceResult:
         for round_number in range(1, self.config.max_rounds + 1):
             self.state.round_number = round_number
-            order = self.normal_ids()
-            if self.config.include_bu_king:
-                order.append(BU_KING_ID)
-            self.rng.shuffle(order)
+            order = self.build_round_order(round_number)
             round_rolls = self.roll_round_values(
                 dango_id for dango_id in order if dango_id != BU_KING_ID
             )
@@ -75,6 +72,13 @@ class RaceEngine:
         return [
             dango.id for dango in self.participants if not dango.is_special
         ]
+
+    def build_round_order(self, round_number: int) -> list[str]:
+        order = self.normal_ids()
+        if self.config.include_bu_king and round_number >= 3:
+            order.append(BU_KING_ID)
+        self.rng.shuffle(order)
+        return order
 
     def normalize_position(self, position: int) -> int:
         return position % self.config.board.finish
@@ -176,36 +180,40 @@ class RaceEngine:
     ) -> None:
         return None
 
-    def take_bu_king_turn(self) -> None:
+    def bu_king_group(self) -> list[str]:
+        position = self.state.position_of(BU_KING_ID)
+        stack = self.state.stack_at(position)
+        return stack[stack.index(BU_KING_ID):]
+
+    def take_bu_king_turn(self, base_roll: int | None = None) -> None:
         if not self.config.include_bu_king or self.state.round_number < 3:
             return
 
-        roll = int(self.rng.choice([1, 2, 3, 4, 5, 6]))
-        source = self.state.position_of(BU_KING_ID)
-        target = source - roll
-        normal_ids = set(self.normal_ids())
-        contacted_positions = sorted(
-            [
-                position
-                for position, stack in self.state.positions.items()
-                if target <= position < source
-                and any(dango_id in normal_ids for dango_id in stack)
-            ],
-            reverse=True,
+        roll = (
+            int(base_roll)
+            if base_roll is not None
+            else int(self.rng.choice([1, 2, 3, 4, 5, 6]))
         )
+        path: list[int] = []
+        for _ in range(roll):
+            source = self.state.position_of(BU_KING_ID)
+            destination = self.previous_position(source)
+            carried_group = self.bu_king_group()
+            carried_above_bu_king = carried_group[1:]
+            destination_stack = self.state.stack_at(destination)
 
-        carried_group = self.state.lift_group_from(BU_KING_ID)
-        for position in contacted_positions:
-            carried_group.extend(
-                dango_id
-                for dango_id in self.state.stack_at(position)
-                if dango_id in normal_ids
-            )
+            self.state.remove_ids(carried_group)
+            self.state.positions[destination] = [
+                BU_KING_ID,
+                *destination_stack,
+                *carried_above_bu_king,
+            ]
+            path.append(destination)
 
-        self.state.remove_ids(carried_group)
-        target = self.normalize_position(target)
-        self.state.place_group(carried_group, target)
-        self.resolve_tiles(carried_group, target)
+        final_position = self.state.position_of(BU_KING_ID)
+        final_group = self.bu_king_group()
+        self.resolve_tiles(final_group, final_position)
+        self.after_any_move(final_group, path, BU_KING_ID)
 
     def end_round(self) -> None:
         if not self.config.include_bu_king:

@@ -1,3 +1,5 @@
+import random
+
 from dango_sim.engine import RaceEngine
 from dango_sim.models import BU_KING_ID, Board, Dango, RaceConfig, RaceState
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
@@ -352,89 +354,57 @@ def test_engine_stops_infinite_tile_loop():
         raise AssertionError("expected tile loop guard")
 
 
-def test_bu_king_is_added_at_finish_and_excluded_from_ranking():
+def test_bu_king_starts_at_zero_and_is_excluded_from_ranking():
     config = RaceConfig(board=Board(finish=10), participants=[Dango(id="a", name="A")])
-    engine = RaceEngine(config, rng=FixedRng([]))
+    engine = RaceEngine(config)
 
-    assert engine.state.stack_at(10) == [BU_KING_ID]
+    assert engine.state.position_of(BU_KING_ID) == 0
     assert BU_KING_ID not in engine.rankings()
 
 
-def test_bu_king_starts_acting_on_round_three():
-    config = RaceConfig(board=Board(finish=10), participants=[Dango(id="a", name="A")])
-    engine = RaceEngine(config, rng=FixedRng([1]))
-
-    engine.state.round_number = 2
-    engine.take_bu_king_turn()
-    assert engine.state.stack_at(10) == [BU_KING_ID]
-
-    engine.state.round_number = 3
-    engine.take_bu_king_turn()
-    assert engine.state.stack_at(9) == [BU_KING_ID]
-
-
-def test_bu_king_contacts_stack_and_carries_it_backward_from_bottom():
+def test_round_order_excludes_bu_king_before_round_three():
     config = RaceConfig(
         board=Board(finish=10),
         participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
     )
-    engine = RaceEngine(config, rng=FixedRng([3]))
-    engine.state = RaceState(positions={10: [BU_KING_ID], 7: ["a", "b"]}, round_number=3)
+    engine = RaceEngine(config, random.Random(1))
 
-    engine.take_bu_king_turn()
+    assert BU_KING_ID not in engine.build_round_order(1)
+    assert BU_KING_ID not in engine.build_round_order(2)
+    assert BU_KING_ID in engine.build_round_order(3)
 
-    assert engine.state.stack_at(7) == [BU_KING_ID, "a", "b"]
 
-
-def test_bu_king_collects_every_stack_crossed_in_encounter_order():
+def test_bu_king_moves_backward_stepwise_and_carries_contacted_dango():
     config = RaceConfig(
-        board=Board(finish=10),
+        board=Board(finish=8),
         participants=[
             Dango(id="a", name="A"),
             Dango(id="b", name="B"),
             Dango(id="c", name="C"),
         ],
     )
-    engine = RaceEngine(config, rng=FixedRng([6]))
-    engine.state = RaceState(
-        positions={10: [BU_KING_ID], 8: ["a"], 5: ["b", "c"]},
-        round_number=3,
-    )
+    engine = RaceEngine(config)
+    engine.state.round_number = 3
+    engine.state.positions = {0: [BU_KING_ID], 7: ["a"], 6: ["b", "c"]}
 
-    engine.take_bu_king_turn()
+    engine.take_bu_king_turn(base_roll=2)
 
-    assert engine.state.stack_at(8) == []
-    assert engine.state.stack_at(5) == []
-    assert engine.state.stack_at(4) == [BU_KING_ID, "a", "b", "c"]
+    assert engine.state.positions == {6: [BU_KING_ID, "b", "c", "a"]}
 
 
-def test_bu_king_resolves_tiles_after_collecting_crossed_stacks():
+def test_bu_king_tile_effect_keeps_bu_king_at_bottom():
     config = RaceConfig(
-        board=Board(finish=10, tiles={7: Booster()}),
+        board=Board(finish=8, tiles={6: SpaceTimeRift()}),
         participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
     )
-    engine = RaceEngine(config, rng=FixedRng([3]))
-    engine.state = RaceState(positions={10: [BU_KING_ID], 7: ["a", "b"]}, round_number=3)
+    engine = RaceEngine(config, random.Random(1))
+    engine.state.round_number = 3
+    engine.state.positions = {0: [BU_KING_ID], 7: ["a"], 6: ["b"]}
 
-    engine.take_bu_king_turn()
+    engine.take_bu_king_turn(base_roll=2)
 
-    assert engine.state.stack_at(7) == []
-    assert engine.state.stack_at(8) == [BU_KING_ID, "a", "b"]
-
-
-def test_bu_king_wrapping_target_resolves_tile_at_group_position():
-    config = RaceConfig(
-        board=Board(finish=10, tiles={8: SpaceTimeRift()}),
-        participants=[Dango(id="a", name="A")],
-    )
-    engine = RaceEngine(config, rng=FixedRng([6]))
-    engine.state = RaceState(positions={4: [BU_KING_ID], 3: ["a"]}, round_number=3)
-
-    engine.take_bu_king_turn()
-
-    assert all(0 <= position < config.board.finish for position in engine.state.positions)
-    assert engine.state.stack_at(8) == [BU_KING_ID, "a"]
-    assert 8 in engine.state.positions
+    assert engine.state.positions[6][0] == BU_KING_ID
+    assert sorted(engine.state.positions[6][1:]) == ["a", "b"]
 
 
 def test_bu_king_teleports_to_finish_when_separated_from_last_place():
@@ -513,23 +483,6 @@ class OrderRecordingRng:
 
     def random(self):
         return 0.5
-
-
-def test_bu_king_included_in_shuffled_turn_order():
-    """Bu King participates in the random turn order each round."""
-    config = RaceConfig(
-        board=Board(finish=3),
-        participants=[Dango(id="a", name="A")],
-    )
-    rng = OrderRecordingRng([3])
-    engine = RaceEngine(config, rng=rng)
-
-    engine.run()
-
-    assert len(rng.shuffled_orders) >= 1
-    for order in rng.shuffled_orders:
-        assert "a" in order
-        assert BU_KING_ID in order
 
 
 def test_bu_king_absent_from_turn_order_when_excluded():
