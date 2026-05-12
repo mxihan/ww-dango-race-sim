@@ -128,10 +128,40 @@ class RaceState:
     round_number: int = 0
     finished_group: list[str] | None = None
     finished_position: int | None = None
+    laps_completed: dict[str, int] = field(default_factory=dict)
 
     @classmethod
     def initial(cls, dango_ids: list[str], start_position: int = 0) -> RaceState:
-        return cls(positions={start_position: list(dango_ids)})
+        return cls(
+            positions={start_position: list(dango_ids)},
+            laps_completed={dango_id: 0 for dango_id in dango_ids},
+        )
+
+    @classmethod
+    def empty(cls, dango_ids: list[str]) -> RaceState:
+        return cls(
+            positions={},
+            laps_completed={dango_id: 0 for dango_id in dango_ids},
+        )
+
+    @classmethod
+    def from_starting_state(cls, starting_state: RaceStartingState) -> RaceState:
+        return cls(
+            positions={
+                position: list(stack)
+                for position, stack in starting_state.positions.items()
+            },
+            laps_completed=dict(starting_state.laps_completed),
+        )
+
+    def is_entered(self, dango_id: str) -> bool:
+        return any(dango_id in stack for stack in self.positions.values())
+
+    def enter_at_start(self, dango_id: str) -> None:
+        if self.is_entered(dango_id):
+            return
+        self.place_group([dango_id], 0)
+        self.laps_completed.setdefault(dango_id, 0)
 
     def stack_at(self, position: int) -> list[str]:
         return list(self.positions.get(position, []))

@@ -206,3 +206,37 @@ def test_starting_state_copies_positions_and_laps():
 
     with pytest.raises(TypeError):
         starting_state.positions[0] = ("b",)
+
+
+def test_race_state_can_start_with_no_entered_dango():
+    state = RaceState.empty(["a", "b"])
+
+    assert state.positions == {}
+    assert not state.is_entered("a")
+    assert state.laps_completed == {"a": 0, "b": 0}
+
+
+def test_race_state_enter_at_start_places_dango_once():
+    state = RaceState.empty(["a", "b"])
+
+    state.enter_at_start("a")
+
+    assert state.is_entered("a")
+    assert state.stack_at(0) == ["a"]
+
+    state.enter_at_start("a")
+    assert state.stack_at(0) == ["a"]
+
+
+def test_race_state_from_starting_state_preserves_laps_and_stacks():
+    starting_state = RaceStartingState(
+        positions={3: ["a", "b"]},
+        laps_completed={"a": 1, "b": 0},
+    )
+
+    state = RaceState.from_starting_state(starting_state)
+
+    assert state.positions == {3: ["a", "b"]}
+    assert state.laps_completed == {"a": 1, "b": 0}
+    assert state.is_entered("a")
+    assert state.is_entered("b")
