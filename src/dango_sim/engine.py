@@ -203,6 +203,7 @@ class RaceEngine:
             )
 
         self.state.remove_ids(carried_group)
+        target = self.normalize_position(target)
         self.state.place_group(carried_group, target)
         self.resolve_tiles(carried_group, target)
 

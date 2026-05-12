@@ -1,6 +1,6 @@
 from dango_sim.engine import RaceEngine
 from dango_sim.models import BU_KING_ID, Board, Dango, RaceConfig, RaceState
-from dango_sim.tiles import Booster, Inhibitor
+from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
 
 class FixedRng:
@@ -420,6 +420,21 @@ def test_bu_king_resolves_tiles_after_collecting_crossed_stacks():
 
     assert engine.state.stack_at(7) == []
     assert engine.state.stack_at(8) == [BU_KING_ID, "a", "b"]
+
+
+def test_bu_king_wrapping_target_resolves_tile_at_group_position():
+    config = RaceConfig(
+        board=Board(finish=10, tiles={8: SpaceTimeRift()}),
+        participants=[Dango(id="a", name="A")],
+    )
+    engine = RaceEngine(config, rng=FixedRng([6]))
+    engine.state = RaceState(positions={4: [BU_KING_ID], 3: ["a"]}, round_number=3)
+
+    engine.take_bu_king_turn()
+
+    assert all(0 <= position < config.board.finish for position in engine.state.positions)
+    assert engine.state.stack_at(8) == [BU_KING_ID, "a"]
+    assert 8 in engine.state.positions
 
 
 def test_bu_king_teleports_to_finish_when_separated_from_last_place():
