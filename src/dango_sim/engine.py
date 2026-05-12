@@ -27,14 +27,18 @@ class RaceEngine:
         self.dangos: dict[str, Dango] = {
             dango.id: dango for dango in self.participants
         }
-        self.state = RaceState.initial(self.normal_ids())
+        if self.config.starting_state is None:
+            self.state = RaceState.empty(self.normal_ids())
+        else:
+            self.state = RaceState.from_starting_state(self.config.starting_state)
         if self.config.include_bu_king:
             self.dangos[BU_KING_ID] = Dango(
                 id=BU_KING_ID,
                 name="Bu King",
                 is_special=True,
             )
-            self.state.place_group([BU_KING_ID], 0, bottom=True)
+            if not self.state.is_entered(BU_KING_ID):
+                self.state.place_group([BU_KING_ID], 0, bottom=True)
 
     def run(self) -> RaceResult:
         for round_number in range(1, self.config.max_rounds + 1):
@@ -191,6 +195,9 @@ class RaceEngine:
             dango.skill.before_move(dango, self.state, context, self.rng)
         if context.blocked or context.movement <= 0:
             return
+
+        if not self.state.is_entered(dango_id):
+            self.state.enter_at_start(dango_id)
 
         source = self.state.position_of(dango_id)
         group = self.state.lift_group_from(dango_id)
@@ -391,6 +398,13 @@ class RaceEngine:
                 for dango_id in reversed(self.state.stack_at(position))
                 if dango_id in normal_ids and dango_id not in ordered
             )
+
+        unentered = [
+            dango_id for dango_id in normal_ids
+            if dango_id not in ordered
+        ]
+        if unentered:
+            ordered.extend(unentered)
 
         return ordered
 

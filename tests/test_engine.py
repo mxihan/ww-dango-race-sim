@@ -1,7 +1,14 @@
 import random
 
 from dango_sim.engine import RaceEngine
-from dango_sim.models import BU_KING_ID, Board, Dango, RaceConfig, RaceState
+from dango_sim.models import (
+    BU_KING_ID,
+    Board,
+    Dango,
+    RaceConfig,
+    RaceStartingState,
+    RaceState,
+)
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
 
@@ -669,3 +676,36 @@ def test_full_loop_race_returns_valid_result():
     assert result.winner_id in {"a", "b"}
     assert set(result.rankings) == {"a", "b"}
     assert result.rounds >= 1
+
+
+def test_without_starting_state_dangos_are_not_on_board_until_first_action():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+
+    assert engine.state.positions == {}
+    assert not engine.state.is_entered("a")
+
+    engine.take_turn("a", base_roll=2, round_rolls={"a": 2, "b": 1})
+
+    assert engine.state.positions == {2: ["a"]}
+    assert not engine.state.is_entered("b")
+
+
+def test_with_starting_state_preserves_initial_stacks_and_laps():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+        starting_state=RaceStartingState(
+            positions={4: ["a", "b"]},
+            laps_completed={"a": 1, "b": 0},
+        ),
+    )
+    engine = RaceEngine(config)
+
+    assert engine.state.positions == {4: ["a", "b"]}
+    assert engine.state.laps_completed == {"a": 1, "b": 0}

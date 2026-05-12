@@ -360,3 +360,22 @@ def test_chisa_uses_base_movement_roll_pool_before_modifiers():
         engine.rng,
     ) == 3
     assert context.round_rolls == {"chisa": 1, "other": 1}
+
+
+def test_aemeath_ignores_unentered_dango_targets():
+    skill = AemeathSkill()
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[
+            Dango(id="aemeath", name="Aemeath", skill=skill),
+            Dango(id="target", name="Target"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+
+    engine.take_turn("aemeath", base_roll=6, round_rolls={"aemeath": 6, "target": 1})
+
+    engine_skill = engine.dangos["aemeath"].skill
+    assert engine_skill.waiting
+    assert engine.state.positions == {6: ["aemeath"]}
