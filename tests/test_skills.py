@@ -379,3 +379,25 @@ def test_aemeath_ignores_unentered_dango_targets():
     engine_skill = engine.dangos["aemeath"].skill
     assert engine_skill.waiting
     assert engine.state.positions == {6: ["aemeath"]}
+
+
+def test_chisa_minimum_check_includes_bu_king_once_bu_king_can_act():
+    skill = ChisaSkill()
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[Dango(id="chisa", name="Chisa", skill=skill)],
+    )
+    engine = RaceEngine(config)
+    context = TurnContext(
+        round_rolls={"chisa": 2, BU_KING_ID: 1},
+        base_roll=2,
+        movement=2,
+    )
+
+    assert skill.modify_roll(
+        engine.dangos["chisa"],
+        2,
+        engine.state,
+        context,
+        engine.rng,
+    ) == 2

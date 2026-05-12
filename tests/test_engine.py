@@ -765,3 +765,41 @@ def test_second_half_dango_with_zero_laps_needs_two_finishes():
     assert not engine.has_finished()
     assert engine.state.laps_completed["a"] == 1
     assert engine.state.positions[0] == ["a"]
+
+
+def test_bu_king_in_starting_state_does_not_roll_before_round_three():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        starting_state=RaceStartingState(
+            positions={5: [BU_KING_ID], 2: ["a"]},
+            laps_completed={"a": 1},
+        ),
+    )
+    engine = RaceEngine(config, rng=QueueRng([3, 2]))
+
+    actors = engine.actors_for_round(1)
+    order_rolls = engine.roll_order_values(actors, round_number=1)
+    move_rolls = engine.roll_round_values(actors)
+
+    assert actors == ["a"]
+    assert order_rolls == {"a": 3}
+    assert move_rolls == {"a": 2}
+    assert engine.state.position_of(BU_KING_ID) == 5
+
+
+def test_bu_king_uses_configurable_order_faces_and_fixed_movement_faces_from_round_three():
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        bu_king_order_faces="d6",
+    )
+    engine = RaceEngine(config, rng=QueueRng([2, 6, 1, 5]))
+
+    actors = engine.actors_for_round(3)
+    order_rolls = engine.roll_order_values(actors, round_number=3)
+    move_rolls = engine.roll_round_values(actors)
+
+    assert actors == ["a", BU_KING_ID]
+    assert order_rolls[BU_KING_ID] == 6
+    assert move_rolls[BU_KING_ID] == 5
