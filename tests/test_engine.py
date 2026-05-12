@@ -606,3 +606,16 @@ def test_race_completes_with_bu_king_in_shuffled_order():
     assert result.winner_id in ("a", "b")
     assert len(result.rankings) == 2
     assert BU_KING_ID not in result.rankings
+
+
+def test_full_loop_race_returns_valid_result():
+    config = RaceConfig(
+        board=Board(finish=10, tiles={3: Booster(), 6: Inhibitor()}),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+    )
+
+    result = RaceEngine(config, random.Random(7)).run()
+
+    assert result.winner_id in {"a", "b"}
+    assert set(result.rankings) == {"a", "b"}
+    assert result.rounds >= 1
