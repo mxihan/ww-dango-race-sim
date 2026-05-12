@@ -24,3 +24,30 @@ uv run python main.py --runs 1000 --seed 42
 ```
 
 The core API accepts a fresh `RaceConfig` per simulation, so callers can vary participants and boards between races.
+
+## Starting states
+
+Second-half simulations can start from an editable JSON file:
+
+```json
+{
+  "positions": {
+    "0": ["carlotta"],
+    "7": ["bu_king", "chisa"]
+  },
+  "laps_completed": {
+    "carlotta": 1,
+    "chisa": 0
+  }
+}
+```
+
+Stacks are listed from bottom to top. If Bu King is present in the file, its
+position is preserved, but it still does not roll or act until round 3 of the
+current half.
+
+Run a second-half simulation with top-N probabilities:
+
+```bash
+uv run python main.py --runs 1000 --seed 42 --starting-state second-half.json --top-n 3 4
+```

@@ -55,6 +55,9 @@ Core simulation library for dango races. Provides domain models, a turn-based ra
 - Mutable dataclasses for stateful objects (`RaceState`, skills with `used`/`index` tracking)
 - `MappingProxyType` wrapping to freeze dicts after construction
 - Factory pattern: `config_factory: Callable[[], RaceConfig]` ensures fresh state per simulation
+- Turn order is dice-based: order rolls are pre-rolled, grouped by value, sorted by `RaceConfig.order_direction`, and shuffled only within equal-value groups.
+- Starting states are editable JSON via `state_io.py`; no-start races begin with normal dango unentered until their first action.
+- Bu King may be loaded from a starting state but does not roll or act before round 3 of the current half.
 
 ## Dependencies
 
