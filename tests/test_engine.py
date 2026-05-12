@@ -242,6 +242,39 @@ def test_engine_resolves_tile_chaining():
     assert engine.state.stack_at(4) == ["a"]
 
 
+def test_booster_tile_finishes_when_forward_path_passes_start():
+    config = RaceConfig(
+        board=Board(finish=5, tiles={4: Booster()}),
+        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {3: ["a"], 1: ["b"]}
+
+    engine.take_turn("a", base_roll=1, round_rolls={"a": 1, "b": 1})
+
+    assert engine.has_finished()
+    assert engine.state.finished_group == ["a"]
+    assert engine.state.finished_position == 0
+    assert engine.state.positions == {1: ["b"], 0: ["a"]}
+    assert 5 not in engine.state.positions
+
+
+def test_inhibitor_tile_wraps_backward_without_finishing():
+    config = RaceConfig(
+        board=Board(finish=5, tiles={1: Inhibitor(steps=2)}),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+
+    engine.take_turn("a", base_roll=1, round_rolls={"a": 1})
+
+    assert not engine.has_finished()
+    assert engine.state.positions == {4: ["a"]}
+    assert -1 not in engine.state.positions
+
+
 def test_engine_allows_tile_chain_to_end_at_max_depth():
     config = RaceConfig(
         board=Board(finish=10, tiles={2: Booster(), 3: Booster()}),

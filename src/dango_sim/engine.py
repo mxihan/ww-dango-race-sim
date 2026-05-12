@@ -231,6 +231,16 @@ class RaceEngine:
             if next_position == current:
                 return
 
+            steps = next_position - current
+            path = self.forward_path(current, steps) if steps > 0 else []
+            if self.path_passes_start(path):
+                self.state.remove_ids(group)
+                self.state.finished_group = list(reversed(group))
+                self.state.finished_position = 0
+                self.state.place_group(group, 0)
+                return
+
+            next_position = self.normalize_position(next_position)
             self.state.remove_ids(group)
             self.state.place_group(group, next_position)
             current = next_position
