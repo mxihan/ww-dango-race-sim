@@ -57,6 +57,17 @@ def run_simulations(
     max_workers: int | None = None,
     top_n: Iterable[int] = (),
 ) -> SimulationSummary:
+    """Run multiple independent race simulations and aggregate results.
+
+    Args:
+        max_workers: When set to an integer > 1, uses process-based
+            parallelism via ProcessPoolExecutor. ``None`` (default) runs
+            sequentially. Each ``config_factory()`` call must produce a
+            fresh config with independent skill instances; skill objects
+            must not be shared across calls when using parallel execution.
+            ``engine_cls`` must be a picklable module-level class when
+            ``max_workers > 1``.
+    """
     if runs <= 0:
         raise ValueError("runs must be positive")
 
