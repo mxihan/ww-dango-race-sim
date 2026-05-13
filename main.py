@@ -41,6 +41,12 @@ def main() -> None:
         default=[],
         help="also report probability of each dango finishing in each top-N bucket",
     )
+    parser.add_argument(
+        "--workers",
+        type=positive_int,
+        default=None,
+        help="number of parallel workers (default: sequential)",
+    )
     args = parser.parse_args()
 
     starting_state = (
@@ -53,6 +59,7 @@ def main() -> None:
         runs=args.runs,
         seed=args.seed,
         top_n=args.top_n,
+        max_workers=args.workers,
     )
     print(f"Runs: {summary.runs}")
     print(f"Average rounds: {summary.average_rounds:.2f}")
