@@ -17,10 +17,29 @@ reached.
 uv run pytest
 ```
 
+## CLI flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--runs` | 1000 | Number of simulations |
+| `--seed` | random | Random seed |
+| `--starting-state` | — | JSON starting state for second-half sims |
+| `--top-n` | — | Report top-N finish probabilities (e.g. `--top-n 3 4`) |
+| `--workers` | sequential | Parallel worker count |
+| `--no-stats` | off | Skip statistics for maximum throughput |
+| `--trace` | off | Record race traces (optional count, default 10) |
+| `--trace-output` | `traces.json` | Output file for trace data |
+
 ## Run sample simulations
 
 ```bash
 uv run python main.py --runs 1000 --seed 42
+```
+
+Record traces for visual replay:
+
+```bash
+uv run python main.py --runs 1000 --seed 42 --trace 20 --trace-output traces.json
 ```
 
 The core API accepts a fresh `RaceConfig` per simulation, so callers can vary participants and boards between races.
@@ -51,3 +70,13 @@ Run a second-half simulation with top-N probabilities:
 ```bash
 uv run python main.py --runs 1000 --seed 42 --starting-state second-half.json --top-n 3 4
 ```
+
+## Trace Viewer
+
+Vue 3 SPA that loads `traces.json` and replays races visually — board grid with dango pieces, color-coded event timeline, and playback controls.
+
+```bash
+cd viewer && npm install && npm run dev
+```
+
+Open the local URL, then drag-and-drop or browse for a `traces.json` file.
