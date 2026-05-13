@@ -1,5 +1,12 @@
 """Dango race simulator package."""
 
+from dango_sim.listener import (
+    RaceTrace,
+    SimulationStats,
+    StatsCollector,
+    TraceEvent,
+    TraceRecorder,
+)
 from dango_sim.models import (
     Board,
     Dango,
@@ -16,7 +23,12 @@ __all__ = [
     "RaceConfig",
     "RaceResult",
     "RaceStartingState",
+    "RaceTrace",
+    "SimulationStats",
     "SimulationSummary",
+    "StatsCollector",
+    "TraceEvent",
+    "TraceRecorder",
     "dump_starting_state",
     "load_starting_state",
     "run_simulations",

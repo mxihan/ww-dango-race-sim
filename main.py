@@ -47,6 +47,20 @@ def main() -> None:
         default=None,
         help="number of parallel workers (default: sequential)",
     )
+    parser.add_argument(
+        "--no-stats",
+        action="store_true",
+        default=False,
+        help="disable statistics collection for maximum throughput",
+    )
+    parser.add_argument(
+        "--trace",
+        type=positive_int,
+        nargs="?",
+        const=10,
+        default=None,
+        help="record race traces (optional: number of races to trace, default: 10)",
+    )
     args = parser.parse_args()
 
     starting_state = (
@@ -60,6 +74,9 @@ def main() -> None:
         seed=args.seed,
         top_n=args.top_n,
         max_workers=args.workers,
+        stats=not args.no_stats,
+        trace=args.trace is not None,
+        trace_limit=args.trace,
     )
     print(f"Runs: {summary.runs}")
     print(f"Average rounds: {summary.average_rounds:.2f}")
@@ -77,6 +94,23 @@ def main() -> None:
         print(f"Top {n} rates:")
         for dango_id, rate in sorted(rates.items(), key=lambda item: (-item[1], item[0])):
             print(f"  {dango_id}: {rate * 100:.2f}%")
+
+    if summary.stats is not None:
+        print("\nSkill triggers:")
+        for dango_id in sorted(summary.stats.skill_triggers):
+            hooks = summary.stats.skill_triggers[dango_id]
+            parts = [f"{hook}={count}" for hook, count in sorted(hooks.items())]
+            print(f"  {dango_id}: {', '.join(parts)}")
+
+        print("\nPosition heatmap:")
+        for dango_id in sorted(summary.stats.position_heatmap):
+            heatmap = summary.stats.position_heatmap[dango_id]
+            top_positions = sorted(heatmap.items(), key=lambda item: -item[1])[:5]
+            parts = [f"pos {pos}: {freq * 100:.1f}%" for pos, freq in top_positions]
+            print(f"  {dango_id}: {', '.join(parts)}")
+
+    if summary.traces is not None:
+        print(f"\nTraces: {len(summary.traces)} races recorded")
 
 
 if __name__ == "__main__":
