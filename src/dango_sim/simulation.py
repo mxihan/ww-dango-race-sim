@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Callable, Iterable, Mapping
@@ -42,35 +43,52 @@ class SimulationSummary:
         )
 
 
+def _run_single(args: tuple) -> object:
+    config, seed, engine_cls = args
+    return engine_cls(config, random.Random(seed)).run()
+
+
 def run_simulations(
     *,
     config_factory: Callable[[], RaceConfig],
     runs: int,
     seed: int | None = None,
     engine_cls=RaceEngine,
+    max_workers: int | None = None,
     top_n: Iterable[int] = (),
 ) -> SimulationSummary:
     if runs <= 0:
         raise ValueError("runs must be positive")
 
     master_rng = random.Random(seed)
+    top_n_values = sorted({int(value) for value in top_n})
+    if any(value <= 0 for value in top_n_values):
+        raise ValueError("top_n values must be positive")
+
+    configs = [config_factory() for _ in range(runs)]
+    seeds = [master_rng.randrange(2**63) for _ in range(runs)]
+
+    if max_workers is not None and max_workers > 1:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(
+                _run_single,
+                [(c, s, engine_cls) for c, s in zip(configs, seeds)],
+            ))
+    else:
+        results = [
+            engine_cls(config, random.Random(seed)).run()
+            for config, seed in zip(configs, seeds)
+        ]
+
     wins: dict[str, int] = {}
     rank_totals: dict[str, int] = {}
     rank_counts: dict[str, int] = {}
     total_rounds = 0
-
-    top_n_values = sorted({int(value) for value in top_n})
-    if any(value <= 0 for value in top_n_values):
-        raise ValueError("top_n values must be positive")
     top_n_counts: dict[int, dict[str, int]] = {
         value: {} for value in top_n_values
     }
 
-    for _ in range(runs):
-        config = config_factory()
-        engine = engine_cls(config, random.Random(master_rng.randrange(2**63)))
-        result = engine.run()
-
+    for result in results:
         wins[result.winner_id] = wins.get(result.winner_id, 0) + 1
         total_rounds += result.rounds
 
