@@ -129,6 +129,16 @@ class RaceState:
     finished_group: list[str] | None = None
     finished_position: int | None = None
     laps_completed: dict[str, int] = field(default_factory=dict)
+    _pos_index: dict[str, int] = field(default_factory=dict, repr=False)
+
+    def __post_init__(self) -> None:
+        self._rebuild_index()
+
+    def _rebuild_index(self) -> None:
+        self._pos_index = {}
+        for position, stack in self.positions.items():
+            for dango_id in stack:
+                self._pos_index[dango_id] = position
 
     @classmethod
     def initial(cls, dango_ids: list[str], start_position: int = 0) -> RaceState:
@@ -155,7 +165,17 @@ class RaceState:
         )
 
     def is_entered(self, dango_id: str) -> bool:
-        return any(dango_id in stack for stack in self.positions.values())
+        pos = self._pos_index.get(dango_id)
+        if pos is not None:
+            if pos in self.positions and dango_id in self.positions[pos]:
+                return True
+        # Lazy fallback for stale index
+        for position, stack in self.positions.items():
+            if dango_id in stack:
+                # Rebuild index entry
+                self._pos_index[dango_id] = position
+                return True
+        return False
 
     def enter_at_start(self, dango_id: str) -> None:
         if self.is_entered(dango_id):
@@ -167,8 +187,14 @@ class RaceState:
         return list(self.positions.get(position, []))
 
     def position_of(self, dango_id: str) -> int:
+        pos = self._pos_index.get(dango_id)
+        if pos is not None:
+            stack = self.positions.get(pos)
+            if stack is not None and dango_id in stack:
+                return pos
         for position, stack in self.positions.items():
             if dango_id in stack:
+                self._pos_index[dango_id] = position
                 return position
         raise KeyError(dango_id)
 
@@ -184,19 +210,32 @@ class RaceState:
         self.positions[position] = stack[:index]
         if not self.positions[position]:
             del self.positions[position]
+        for gid in group:
+            self._pos_index.pop(gid, None)
         return group
 
     def remove_ids(self, dango_ids: list[str]) -> None:
         to_remove = set(dango_ids)
-        empty_positions = []
-        for position, stack in self.positions.items():
+        affected: set[int] = set()
+        # Try to use index for targeted removal
+        for dango_id in to_remove:
+            pos = self._pos_index.get(dango_id)
+            if pos is not None:
+                affected.add(pos)
+        # Fallback to full scan if index is stale (no positions found or dangos not in index)
+        if not affected or any(d_id not in self._pos_index for d_id in to_remove):
+            affected = set(self.positions.keys())
+        empty_positions: list[int] = []
+        for position in affected:
             self.positions[position] = [
-                dango_id for dango_id in stack if dango_id not in to_remove
+                dango_id for dango_id in self.positions[position] if dango_id not in to_remove
             ]
             if not self.positions[position]:
                 empty_positions.append(position)
         for position in empty_positions:
             del self.positions[position]
+        for dango_id in to_remove:
+            self._pos_index.pop(dango_id, None)
 
     def place_group(self, group: list[str], position: int, *, bottom: bool = False) -> None:
         existing = self.positions.setdefault(position, [])
@@ -204,6 +243,8 @@ class RaceState:
             self.positions[position] = list(group) + existing
         else:
             existing.extend(group)
+        for dango_id in group:
+            self._pos_index[dango_id] = position
 
     def all_stacks(self) -> dict[int, list[str]]:
         return {position: list(stack) for position, stack in self.positions.items()}
