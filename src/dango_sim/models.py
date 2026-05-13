@@ -24,6 +24,9 @@ class Board:
     def __post_init__(self) -> None:
         object.__setattr__(self, "tiles", MappingProxyType(dict(self.tiles)))
 
+    def __reduce__(self):
+        return (Board, (self.finish, dict(self.tiles)))
+
 
 @dataclass
 class Dango:
@@ -59,6 +62,9 @@ class RaceStartingState:
                 }
             ),
         )
+
+    def __reduce__(self):
+        return (RaceStartingState, (dict(self.positions), dict(self.laps_completed)))
 
 
 @dataclass
