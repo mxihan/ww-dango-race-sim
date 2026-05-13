@@ -7,6 +7,7 @@ from types import MappingProxyType
 from typing import Callable, Iterable, Mapping
 
 from dango_sim.engine import RaceEngine
+from dango_sim.listener import RaceTrace, SimulationStats, StatsCollector, TraceRecorder
 from dango_sim.models import RaceConfig
 
 
@@ -18,6 +19,8 @@ class SimulationSummary:
     average_rank: Mapping[str, float]
     average_rounds: float
     top_n_rates: Mapping[int, Mapping[str, float]] = field(default_factory=dict)
+    stats: SimulationStats | None = None
+    traces: tuple[RaceTrace, ...] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "wins", MappingProxyType(dict(self.wins)))
@@ -44,8 +47,20 @@ class SimulationSummary:
 
 
 def _run_single(args: tuple) -> object:
-    config, seed, engine_cls = args
-    return engine_cls(config, random.Random(seed)).run()
+    config, seed, engine_cls, collect_stats = args
+    listeners: list[object] = []
+    collector = StatsCollector() if collect_stats else None
+    if collector is not None:
+        listeners.append(collector)
+    engine = engine_cls(config, random.Random(seed), listeners=listeners or None)
+    result = engine.run()
+    stats_data = None
+    if collector is not None:
+        stats_data = {
+            "skill_triggers": collector.skill_triggers,
+            "position_counts": collector.position_counts,
+        }
+    return result, stats_data
 
 
 def run_simulations(
@@ -56,6 +71,9 @@ def run_simulations(
     engine_cls=RaceEngine,
     max_workers: int | None = None,
     top_n: Iterable[int] = (),
+    stats: bool = True,
+    trace: bool = False,
+    trace_limit: int | None = None,
 ) -> SimulationSummary:
     """Run multiple independent race simulations and aggregate results.
 
@@ -78,18 +96,32 @@ def run_simulations(
 
     configs = [config_factory() for _ in range(runs)]
     seeds = [master_rng.randrange(2**63) for _ in range(runs)]
+    collect_stats_flag = stats
 
     if max_workers is not None and max_workers > 1:
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            results = list(executor.map(
+            raw_results = list(executor.map(
                 _run_single,
-                [(c, s, engine_cls) for c, s in zip(configs, seeds)],
+                [(c, s, engine_cls, collect_stats_flag) for c, s in zip(configs, seeds)],
             ))
     else:
-        results = [
-            engine_cls(config, random.Random(seed)).run()
-            for config, seed in zip(configs, seeds)
+        raw_results = [
+            _run_single((c, s, engine_cls, collect_stats_flag))
+            for c, s in zip(configs, seeds)
         ]
+
+    results = [r[0] for r in raw_results]
+    stats_datas = [r[1] for r in raw_results if r[1] is not None]
+
+    # Collect traces (sequential, limited)
+    trace_results: list[RaceTrace] = []
+    if trace:
+        limit = trace_limit if trace_limit is not None else runs
+        for i in range(min(limit, runs)):
+            recorder = TraceRecorder()
+            engine = engine_cls(configs[i], random.Random(seeds[i]), listeners=[recorder])
+            engine.run()
+            trace_results.append(recorder.as_trace())
 
     wins: dict[str, int] = {}
     rank_totals: dict[str, int] = {}
@@ -127,6 +159,33 @@ def run_simulations(
         for n, counts in top_n_counts.items()
     }
 
+    # Aggregate stats
+    sim_stats = None
+    if stats and stats_datas:
+        agg_skill: dict[str, dict[str, int]] = {}
+        agg_pos: dict[str, dict[int, int]] = {}
+        for sd in stats_datas:
+            for dango_id, hooks in sd["skill_triggers"].items():
+                if dango_id not in agg_skill:
+                    agg_skill[dango_id] = {}
+                for hook_name, count in hooks.items():
+                    agg_skill[dango_id][hook_name] = agg_skill[dango_id].get(hook_name, 0) + count
+            for dango_id, positions in sd["position_counts"].items():
+                if dango_id not in agg_pos:
+                    agg_pos[dango_id] = {}
+                for pos, count in positions.items():
+                    agg_pos[dango_id][pos] = agg_pos[dango_id].get(pos, 0) + count
+
+        total_rounds_count = int(total_rounds)
+        heatmap = {
+            dango_id: {pos: count / total_rounds_count for pos, count in positions.items()}
+            for dango_id, positions in agg_pos.items()
+        }
+        sim_stats = SimulationStats(
+            skill_triggers=agg_skill,
+            position_heatmap=heatmap,
+        )
+
     return SimulationSummary(
         runs=runs,
         wins=wins,
@@ -134,4 +193,6 @@ def run_simulations(
         average_rank=average_rank,
         average_rounds=total_rounds / runs,
         top_n_rates=top_n_rates,
+        stats=sim_stats,
+        traces=tuple(trace_results) if trace_results else None,
     )

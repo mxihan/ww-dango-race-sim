@@ -2,6 +2,7 @@ import pytest
 
 from dango_sim.models import Board, Dango, RaceConfig, RaceResult
 from dango_sim.simulation import SimulationSummary, run_simulations
+from dango_sim.listener import SimulationStats
 
 
 class StubEngine:
@@ -11,7 +12,7 @@ class StubEngine:
         RaceResult(winner_id="a", rankings=["a", "b"], rounds=3),
     ]
 
-    def __init__(self, config, rng):
+    def __init__(self, config, rng, listeners=None):
         self.config = config
         self.rng = rng
 
@@ -35,6 +36,7 @@ def test_run_simulations_counts_wins_and_win_rates():
         runs=3,
         seed=7,
         engine_cls=StubEngine,
+        stats=False,
     )
 
     assert summary == SimulationSummary(
@@ -50,7 +52,7 @@ def test_run_simulations_calls_config_factory_once_per_run():
     class RecordingEngine:
         configs = []
 
-        def __init__(self, config, rng):
+        def __init__(self, config, rng, listeners=None):
             self.config = config
             self.rng = rng
             self.configs.append(config)
@@ -99,7 +101,7 @@ def test_run_simulations_uses_deterministic_per_run_rngs():
     class RngRecordingEngine:
         values = []
 
-        def __init__(self, config, rng):
+        def __init__(self, config, rng, listeners=None):
             self.config = config
             self.rng = rng
 
@@ -191,3 +193,87 @@ def test_run_simulations_reports_top_n_rates():
 
     assert dict(summary.top_n_rates[1]) == {"a": 1 / 3, "b": 1 / 3, "c": 1 / 3}
     assert dict(summary.top_n_rates[2]) == {"a": 2 / 3, "b": 2 / 3, "c": 2 / 3}
+
+
+# --- Stats and trace integration tests ---
+
+
+def test_run_simulations_returns_stats_by_default():
+    summary = run_simulations(
+        config_factory=lambda: RaceConfig(
+            board=Board(finish=10),
+            participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+            include_bu_king=False,
+        ),
+        runs=5,
+        seed=1,
+    )
+    assert summary.stats is not None
+    assert isinstance(summary.stats, SimulationStats)
+
+
+def test_run_simulations_stats_disabled():
+    summary = run_simulations(
+        config_factory=lambda: RaceConfig(
+            board=Board(finish=10),
+            participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
+            include_bu_king=False,
+        ),
+        runs=3,
+        seed=1,
+        stats=False,
+    )
+    assert summary.stats is None
+
+
+def test_run_simulations_traces():
+    summary = run_simulations(
+        config_factory=lambda: RaceConfig(
+            board=Board(finish=10),
+            participants=[Dango(id="a", name="A")],
+            include_bu_king=False,
+        ),
+        runs=3,
+        seed=1,
+        trace=True,
+    )
+    assert summary.traces is not None
+    assert len(summary.traces) == 3
+    for trace in summary.traces:
+        assert len(trace.events) > 0
+
+
+def test_run_simulations_trace_limit():
+    summary = run_simulations(
+        config_factory=lambda: RaceConfig(
+            board=Board(finish=10),
+            participants=[Dango(id="a", name="A")],
+            include_bu_king=False,
+        ),
+        runs=10,
+        seed=1,
+        trace=True,
+        trace_limit=2,
+    )
+    assert summary.traces is not None
+    assert len(summary.traces) == 2
+
+
+def test_run_simulations_stats_with_skills():
+    from dango_sim.skills import CarlottaSkill
+    summary = run_simulations(
+        config_factory=lambda: RaceConfig(
+            board=Board(finish=10),
+            participants=[
+                Dango(id="a", name="A", skill=CarlottaSkill()),
+                Dango(id="b", name="B"),
+            ],
+            include_bu_king=False,
+        ),
+        runs=10,
+        seed=1,
+    )
+    assert summary.stats is not None
+    assert "a" in summary.stats.skill_triggers
+    assert "modify_roll" in summary.stats.skill_triggers["a"]
+    assert summary.stats.skill_triggers["a"]["modify_roll"] > 0
