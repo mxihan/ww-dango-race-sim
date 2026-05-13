@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 
 from dango_sim.engine import RaceEngine
+from dango_sim.listener import RaceTrace, TraceEvent, TraceRecorder
 from dango_sim.models import Board, Dango, RaceConfig
 
 
@@ -98,3 +99,73 @@ def test_engine_multiple_listeners():
     assert len(spy1.calls) > 0
     assert len(spy2.calls) > 0
     assert [c[0] for c in spy1.calls] == [c[0] for c in spy2.calls]
+
+
+# --- TraceRecorder tests ---
+
+
+def test_trace_recorder_captures_move():
+    recorder = TraceRecorder()
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, random.Random(0), listeners=[recorder])
+    engine.run()
+    move_events = [e for e in recorder.events if e.kind == "move"]
+    assert len(move_events) >= 1
+    assert move_events[0].data["dango_id"] == "a"
+
+
+def test_trace_event_has_state_snapshot():
+    recorder = TraceRecorder()
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, random.Random(0), listeners=[recorder])
+    engine.run()
+    assert len(recorder.events) > 0
+    snap = recorder.events[0].state_snapshot
+    assert "positions" in snap
+    assert "laps_completed" in snap
+    assert "round_number" in snap
+
+
+def test_race_trace_freeze():
+    events = [
+        TraceEvent(kind="move", round_number=1, data={}, state_snapshot={}),
+        TraceEvent(kind="finish", round_number=1, data={}, state_snapshot={}),
+    ]
+    trace = RaceTrace(events=tuple(events))
+    assert len(trace.events) == 2
+
+
+def test_trace_recorder_finish_event():
+    recorder = TraceRecorder()
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, random.Random(0), listeners=[recorder])
+    engine.run()
+    finish_events = [e for e in recorder.events if e.kind == "finish"]
+    assert len(finish_events) == 1
+    assert "a" in finish_events[0].data["group"]
+
+
+def test_trace_recorder_as_trace():
+    recorder = TraceRecorder()
+    config = RaceConfig(
+        board=Board(finish=10),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, random.Random(0), listeners=[recorder])
+    engine.run()
+    trace = recorder.as_trace()
+    assert isinstance(trace, RaceTrace)
+    assert len(trace.events) == len(recorder.events)
