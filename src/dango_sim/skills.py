@@ -16,6 +16,11 @@ def _is_bottom(dango: Dango, state: RaceState) -> bool:
     return bool(stack) and stack[0] == dango.id and len(stack) >= 2
 
 
+def _has_above(dango: Dango, state: RaceState) -> bool:
+    stack = _stack_for(dango, state)
+    return dango.id in stack and stack.index(dango.id) < len(stack) - 1
+
+
 def _has_below(dango: Dango, state: RaceState) -> bool:
     stack = _stack_for(dango, state)
     return dango.id in stack and stack.index(dango.id) > 0
@@ -91,6 +96,15 @@ class PhrolovaSkill:
 @dataclass
 class JinhsiSkill:
     chance: float = 0.40
+    
+    # def on_turn_start(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+    #     if not _has_above(dango, state) or rng.random() >= self.chance:
+    #         return
+
+    #     position = state.position_of(dango.id)
+    #     stack = state.positions[position]
+    #     stack.remove(dango.id)
+    #     stack.append(dango.id)
 
     def after_group_stacked(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
         group = getattr(context, "group", [])
