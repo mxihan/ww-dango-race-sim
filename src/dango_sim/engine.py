@@ -59,6 +59,10 @@ class RaceEngine:
             if d.skill and hasattr(d.skill, "after_any_move")
         ]
 
+        # Rankings cache
+        self._rankings_cache: list[str] | None = None
+        self._rankings_specials_cache: list[str] | None = None
+
     def run(self) -> RaceResult:
         for round_number in range(1, self.config.max_rounds + 1):
             self.state.round_number = round_number
@@ -299,6 +303,7 @@ class RaceEngine:
         path: list[int] | None = None,
         bottom: bool = False,
     ) -> None:
+        self._invalidate_rankings_cache()
         destination = self.normalize_position(destination)
         self.state.remove_ids(group)
         self.state.place_group(group, destination, bottom=bottom)
@@ -353,6 +358,7 @@ class RaceEngine:
     def take_bu_king_turn(self, base_roll: int | None = None) -> None:
         if not self.config.include_bu_king or self.state.round_number < 3:
             return
+        self._invalidate_rankings_cache()
 
         roll = (
             int(base_roll)
@@ -470,11 +476,19 @@ class RaceEngine:
     def has_finished(self) -> bool:
         return self.state.finished_group is not None
 
+    def _invalidate_rankings_cache(self) -> None:
+        self._rankings_cache = None
+        self._rankings_specials_cache = None
+
     def rankings(self) -> list[str]:
-        return self._rankings(include_specials=False)
+        if self._rankings_cache is None:
+            self._rankings_cache = self._rankings(include_specials=False)
+        return self._rankings_cache
 
     def rankings_with_specials(self) -> list[str]:
-        return self._rankings(include_specials=True)
+        if self._rankings_specials_cache is None:
+            self._rankings_specials_cache = self._rankings(include_specials=True)
+        return self._rankings_specials_cache
 
     def _rankings(self, *, include_specials: bool) -> list[str]:
         normal_ids = set(self.normal_ids())
@@ -521,6 +535,7 @@ class RaceEngine:
         return 2 if self.config.starting_state is not None else 1
 
     def finish_group_at_start(self, group: list[str]) -> None:
+        self._invalidate_rankings_cache()
         normal_ids = set(self.normal_ids())
         self.state.remove_ids(group)
         self.state.place_group(group, 0)
