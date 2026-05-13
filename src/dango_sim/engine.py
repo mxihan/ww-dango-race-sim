@@ -45,6 +45,20 @@ class RaceEngine:
             if not self.state.is_entered(BU_KING_ID):
                 self.state.place_group([BU_KING_ID], 0, bottom=True)
 
+        # Pre-computed hook dispatch tables
+        self._on_round_start_hooks = [
+            d for d in self.participants
+            if d.skill and hasattr(d.skill, "on_round_start")
+        ]
+        self._after_group_stacked_hooks = [
+            d for d in self.participants
+            if d.skill and hasattr(d.skill, "after_group_stacked")
+        ]
+        self._after_any_move_hooks = [
+            d for d in self.participants
+            if d.skill and hasattr(d.skill, "after_any_move")
+        ]
+
     def run(self) -> RaceResult:
         for round_number in range(1, self.config.max_rounds + 1):
             self.state.round_number = round_number
@@ -96,9 +110,8 @@ class RaceEngine:
         self.force_last_this_round_ids = set(self.force_last_next_round_ids)
         self.force_last_next_round_ids.clear()
         self.skip_turns_this_round.clear()
-        for dango in self.participants:
-            if dango.skill and hasattr(dango.skill, "on_round_start"):
-                dango.skill.on_round_start(dango, self.state, self, self.rng)
+        for dango in self._on_round_start_hooks:
+            dango.skill.on_round_start(dango, self.state, self, self.rng)
 
     def force_last_next_round(self, dango_id: str) -> None:
         if dango_id in self.normal_ids():
@@ -307,15 +320,14 @@ class RaceEngine:
             destination=self.normalize_position(position),
             engine=self,
         )
-        for dango in self.participants:
-            if dango.skill and hasattr(dango.skill, "after_group_stacked"):
-                dango.skill.after_group_stacked(
-                    dango,
-                    self.state,
-                    context,
-                    self.rng,
-                    self,
-                )
+        for dango in self._after_group_stacked_hooks:
+            dango.skill.after_group_stacked(
+                dango,
+                self.state,
+                context,
+                self.rng,
+                self,
+            )
 
     def after_any_move(
         self,
@@ -330,9 +342,8 @@ class RaceEngine:
             path=list(path),
             group=list(group),
         )
-        for dango in self.participants:
-            if dango.skill and hasattr(dango.skill, "after_any_move"):
-                dango.skill.after_any_move(dango, self.state, context, self.rng, self)
+        for dango in self._after_any_move_hooks:
+            dango.skill.after_any_move(dango, self.state, context, self.rng, self)
 
     def bu_king_group(self) -> list[str]:
         position = self.state.position_of(BU_KING_ID)
