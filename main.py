@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -61,6 +62,12 @@ def main() -> None:
         default=None,
         help="record race traces (optional: number of races to trace, default: 10)",
     )
+    parser.add_argument(
+        "--trace-output",
+        type=Path,
+        default=Path("traces.json"),
+        help="file to write trace data to (default: traces.json)",
+    )
     args = parser.parse_args()
 
     starting_state = (
@@ -110,7 +117,20 @@ def main() -> None:
             print(f"  {dango_id}: {', '.join(parts)}")
 
     if summary.traces is not None:
-        print(f"\nTraces: {len(summary.traces)} races recorded")
+        trace_data = [
+            [
+                {
+                    "kind": ev.kind,
+                    "round": ev.round_number,
+                    "data": ev.data,
+                    "state": ev.state_snapshot,
+                }
+                for ev in trace.events
+            ]
+            for trace in summary.traces
+        ]
+        args.trace_output.write_text(json.dumps(trace_data, indent=2), encoding="utf-8")
+        print(f"\nTraces: {len(summary.traces)} races recorded -> {args.trace_output}")
 
 
 if __name__ == "__main__":
