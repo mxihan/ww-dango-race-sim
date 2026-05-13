@@ -461,6 +461,8 @@ class RaceEngine:
         if next_position == current:
             return current
 
+        self._invalidate_rankings_cache()
+
         steps = next_position - current
         path = self.forward_path(current, steps) if steps > 0 else []
         if self.path_passes_start(path):
