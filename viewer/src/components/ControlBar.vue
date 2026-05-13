@@ -63,7 +63,7 @@ defineEmits<{
   gap: 16px;
   flex-wrap: wrap;
 }
-.race-tabs { display: flex; gap: 4px; }
+.race-tabs { display: flex; gap: 4px; flex-wrap: wrap; max-height: 62px; overflow-y: auto; }
 .race-tab {
   padding: 4px 12px;
   background: #2a2a3e;
