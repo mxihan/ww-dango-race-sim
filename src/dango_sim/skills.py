@@ -16,11 +16,6 @@ def _is_bottom(dango: Dango, state: RaceState) -> bool:
     return bool(stack) and stack[0] == dango.id and len(stack) >= 2
 
 
-def _has_above(dango: Dango, state: RaceState) -> bool:
-    stack = _stack_for(dango, state)
-    return dango.id in stack and stack.index(dango.id) < len(stack) - 1
-
-
 def _has_below(dango: Dango, state: RaceState) -> bool:
     stack = _stack_for(dango, state)
     return dango.id in stack and stack.index(dango.id) > 0
@@ -79,7 +74,7 @@ class AugustaSkill:
             return
         position = state.position_of(dango.id)
         stack = state.stack_at(position)
-        if stack and stack[-1] == dango.id:
+        if len(stack) >= 2 and stack[-1] == dango.id:
             engine.skip_turn_this_round(dango.id)
             engine.force_last_next_round(dango.id)
 
@@ -97,12 +92,22 @@ class PhrolovaSkill:
 class JinhsiSkill:
     chance: float = 0.40
 
-    def on_turn_start(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
-        if not _has_above(dango, state) or rng.random() >= self.chance:
+    def after_group_stacked(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+        group = getattr(context, "group", [])
+        if dango.id in group or not state.is_entered(dango.id):
             return
 
         position = state.position_of(dango.id)
+        if position != getattr(context, "destination", None):
+            return
+
         stack = state.positions[position]
+        if not any(group_id in stack[stack.index(dango.id) + 1:] for group_id in group):
+            return
+
+        if rng.random() >= self.chance:
+            return
+
         stack.remove(dango.id)
         stack.append(dango.id)
 

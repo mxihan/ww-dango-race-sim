@@ -17,10 +17,11 @@ The implementation should keep each skill independently testable and avoid a bro
 
 Use a minimal extension of the current skill hook system.
 
-The engine already supports dice, movement modification, pre-move behavior, post-move behavior, and reactions to any movement. These new skills need two small additions:
+The engine already supports dice, movement modification, pre-move behavior, post-move behavior, and reactions to any movement. These new skills need three small additions:
 
 - A round-start hook for skills that inspect the current stack before the round's action order is resolved.
 - An action-order adjustment path for skills that skip the current round or force a dango to act last in the next round.
+- A stack-on hook for skills that react when a moving group is placed onto a destination stack.
 
 Movement-related skills should continue to use `before_move`, `after_move`, and `after_any_move` where possible.
 
@@ -44,12 +45,12 @@ Out of scope:
 
 ### Augusta
 
-At the start of each round, if Augusta is already entered and is at the top of its current stack:
+At the start of each round, if Augusta is already entered, is at the top of its current stack, and that stack contains at least two dangos:
 
 - Augusta does not act during that round.
 - Augusta is marked to act last in the next round.
 
-The skip applies only to the current round. The forced-last marker applies only to the next round after the skipped round. If Augusta is unentered at round start, the skill does not trigger.
+The skip applies only to the current round. The forced-last marker applies only to the next round after the skipped round. If Augusta is unentered or alone at round start, the skill does not trigger.
 
 ### Iuno
 
@@ -89,12 +90,12 @@ The forced-last marker applies only to the next round after the check. If Changl
 
 ### Jinhsi
 
-At the start of Jinhsi's own turn, before movement is applied, if Jinhsi is already entered and has one or more dangos above it in the same stack:
+Whenever another moving group is placed onto Jinhsi's current position and at least one member of that new group is stacked above Jinhsi:
 
 - Roll a probability check.
-- With 40% chance, move Jinhsi to the top of its current stack before movement is applied.
+- With 40% chance, move Jinhsi to the top of its current stack.
 
-After moving to the top, normal stack movement rules apply. If Jinhsi then acts, it carries only itself because no dango remains above it.
+This check happens each time a new group stacks onto Jinhsi, even if Jinhsi already has other dangos above it. A group merely passing over Jinhsi's position without landing there does not trigger the skill.
 
 ### Calcharo
 
@@ -120,7 +121,8 @@ At each round:
 4. Build the order from normal dice rules.
 5. Move any forced-last ids that are present in the order to the end, preserving their relative order.
 6. Skip any actor in `skip_turns_this_round` when its turn is reached.
-7. Let post-move hooks mark ids for the next round.
+7. When a moving group is placed onto a destination stack, call stack-on hooks before continuing later movement reactions.
+8. Let post-move hooks mark ids for the next round.
 
 The round-start hook can be named `on_round_start(dango, state, engine, rng)` so Augusta can inspect stack state before the current round's order is resolved.
 
@@ -142,12 +144,14 @@ Add tests for:
 - Iuno preserves pre-teleport ranking order for teleported dangos.
 - Iuno includes Bu King when finding adjacent ranked entries but never selects Bu King.
 - Iuno triggers when carried through the midpoint.
+- Jinhsi can move to top when a new group lands on Jinhsi's stack.
+- Jinhsi can trigger from tile movement that places a group on Jinhsi's stack.
+- Jinhsi does not trigger when a group only passes over Jinhsi.
 - Phrolova gains 3 movement when at stack bottom.
 - Phrolova does not gain movement when alone, unentered, or not at bottom.
 - Changli can mark itself last next round when dango exist below it.
 - Changli does not mark itself when no dango is below it.
-- Jinhsi can move to top at the start of its own turn when dango exist above it.
-- Jinhsi does not move to top when the turn-start probability check fails.
+- Jinhsi does not move to top when the stack-on probability check fails.
 - Calcharo gains 3 movement when current ranking places it last among normal dangos.
 - Calcharo ignores Bu King when determining last place.
 
@@ -163,8 +167,8 @@ uv run pytest
 - The ambiguous Iuno phrase has been resolved as "teleport selected ranked neighbors to Iuno's own tile."
 - Iuno's neighbor calculation now includes Bu King in ranking context while excluding Bu King from selected teleport targets.
 - Calcharo uses ranking position, not track position.
-- Augusta checks at round start, skips that round, and marks itself last for the next round.
+- Augusta checks at round start, requires at least a two-dango stack, skips that round, and marks itself last for the next round.
 - Phrolova alone in a stack does not trigger the bottom-stack bonus.
 - Changli checks after its own movement and can mark itself last for the next round.
-- Jinhsi checks at the start of its own turn before movement.
+- Jinhsi checks when another group lands on its stack, not when a group only passes over.
 - The design keeps the current hook architecture and avoids a full event bus.

@@ -17,6 +17,7 @@ class TurnContext:
     group: list[str] = field(default_factory=list)
     blocked: bool = False
     engine: object | None = None
+    destination: int | None = None
 
 
 class RaceEngine:
@@ -288,8 +289,33 @@ class RaceEngine:
         destination = self.normalize_position(destination)
         self.state.remove_ids(group)
         self.state.place_group(group, destination, bottom=bottom)
+        self.after_group_stacked(group, destination, actor_id)
         self.resolve_tiles(group, destination)
         self.after_any_move(group, path or [destination], actor_id)
+
+    def after_group_stacked(
+        self,
+        group: list[str],
+        position: int,
+        actor_id: str | None,
+    ) -> None:
+        context = TurnContext(
+            round_rolls={},
+            base_roll=0,
+            movement=0,
+            group=list(group),
+            destination=self.normalize_position(position),
+            engine=self,
+        )
+        for dango in self.participants:
+            if dango.skill and hasattr(dango.skill, "after_group_stacked"):
+                dango.skill.after_group_stacked(
+                    dango,
+                    self.state,
+                    context,
+                    self.rng,
+                    self,
+                )
 
     def after_any_move(
         self,
@@ -427,6 +453,7 @@ class RaceEngine:
         normalized_position = self.normalize_position(next_position)
         self.state.remove_ids(group)
         self.state.place_group(group, normalized_position)
+        self.after_group_stacked(group, normalized_position, actor_id=None)
         return normalized_position
 
     def has_finished(self) -> bool:

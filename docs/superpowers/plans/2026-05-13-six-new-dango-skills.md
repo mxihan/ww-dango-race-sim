@@ -10,6 +10,13 @@
 
 ---
 
+## Post-Implementation Rule Updates
+
+After the original implementation, two skill timings were revised:
+
+- Augusta now requires a stack of at least two dangos and must be the top dango to skip the current round and act last next round.
+- Jinhsi no longer checks at the start of its own turn. Jinhsi checks whenever another moving group is placed onto Jinhsi's current position; passing over Jinhsi without landing does not trigger the skill.
+
 ## File Structure
 
 - Modify `src/dango_sim/engine.py`: add forced-last state, round-start hook dispatch, turn-start hook dispatch, skip handling, Iuno ranking helper, and a `force_last_next_round()` helper.
@@ -240,7 +247,7 @@ def test_phrolova_does_not_get_bonus_when_not_at_bottom():
     assert engine.state.stack_at(3) == ["phrolova"]
 
 
-def test_jinhsi_moves_to_top_at_own_turn_start_when_probability_triggers():
+def test_jinhsi_moves_to_top_when_new_group_stacks_on_her_and_probability_triggers():
     config = RaceConfig(
         board=Board(finish=20),
         participants=[
@@ -259,7 +266,7 @@ def test_jinhsi_moves_to_top_at_own_turn_start_when_probability_triggers():
     assert engine.state.stack_at(3) == ["jinhsi"]
 
 
-def test_jinhsi_stays_in_place_when_probability_fails():
+def test_jinhsi_stays_below_new_group_when_stack_on_probability_misses():
     config = RaceConfig(
         board=Board(finish=20),
         participants=[
@@ -334,7 +341,7 @@ def test_calcharo_gets_bonus_when_ranked_last_ignoring_bu_king():
 Run:
 
 ```powershell
-uv run pytest tests/test_skills.py::test_phrolova_gets_bonus_when_at_stack_bottom tests/test_skills.py::test_phrolova_does_not_get_bonus_when_alone_in_stack tests/test_skills.py::test_jinhsi_moves_to_top_at_own_turn_start_when_probability_triggers tests/test_skills.py::test_changli_marks_next_round_last_after_moving_with_dango_below tests/test_skills.py::test_calcharo_gets_bonus_when_ranked_last_ignoring_bu_king -q
+uv run pytest tests/test_skills.py::test_phrolova_gets_bonus_when_at_stack_bottom tests/test_skills.py::test_phrolova_does_not_get_bonus_when_alone_in_stack tests/test_skills.py::test_jinhsi_moves_to_top_when_new_group_stacks_on_her_and_probability_triggers tests/test_skills.py::test_changli_marks_next_round_last_after_moving_with_dango_below tests/test_skills.py::test_calcharo_gets_bonus_when_ranked_last_ignoring_bu_king -q
 ```
 
 Expected: FAIL because the new skill classes do not exist.
@@ -378,13 +385,17 @@ class PhrolovaSkill:
 class JinhsiSkill:
     chance: float = 0.40
 
-    def on_turn_start(self, dango: Dango, state: RaceState, engine, rng) -> None:
-        if not _has_above(dango.id, state):
+    def after_group_stacked(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+        if dango.id in context.group or not state.is_entered(dango.id):
             return
-        if rng.random() >= self.chance:
+        if state.position_of(dango.id) != context.destination:
             return
         position = state.position_of(dango.id)
         stack = state.positions[position]
+        if not any(group_id in stack[stack.index(dango.id) + 1:] for group_id in context.group):
+            return
+        if rng.random() >= self.chance:
+            return
         stack.remove(dango.id)
         stack.append(dango.id)
 
@@ -427,7 +438,7 @@ engine=self,
 Run:
 
 ```powershell
-uv run pytest tests/test_skills.py::test_phrolova_gets_bonus_when_at_stack_bottom tests/test_skills.py::test_phrolova_does_not_get_bonus_when_alone_in_stack tests/test_skills.py::test_phrolova_does_not_get_bonus_when_not_at_bottom tests/test_skills.py::test_jinhsi_moves_to_top_at_own_turn_start_when_probability_triggers tests/test_skills.py::test_jinhsi_stays_in_place_when_probability_fails tests/test_skills.py::test_changli_marks_next_round_last_after_moving_with_dango_below tests/test_skills.py::test_changli_does_not_mark_next_round_when_no_dango_below_after_move tests/test_skills.py::test_calcharo_gets_bonus_when_ranked_last_ignoring_bu_king -q
+uv run pytest tests/test_skills.py::test_phrolova_gets_bonus_when_at_stack_bottom tests/test_skills.py::test_phrolova_does_not_get_bonus_when_alone_in_stack tests/test_skills.py::test_phrolova_does_not_get_bonus_when_not_at_bottom tests/test_skills.py::test_jinhsi_moves_to_top_when_new_group_stacks_on_her_and_probability_triggers tests/test_skills.py::test_jinhsi_stays_below_new_group_when_stack_on_probability_misses tests/test_skills.py::test_changli_marks_next_round_last_after_moving_with_dango_below tests/test_skills.py::test_changli_does_not_mark_next_round_when_no_dango_below_after_move tests/test_skills.py::test_calcharo_gets_bonus_when_ranked_last_ignoring_bu_king -q
 ```
 
 Expected: PASS.
