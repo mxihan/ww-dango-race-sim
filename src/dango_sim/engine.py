@@ -21,10 +21,11 @@ class TurnContext:
 
 
 class RaceEngine:
-    def __init__(self, config: RaceConfig, rng: random.Random | None = None):
+    def __init__(self, config: RaceConfig, rng: random.Random | None = None, listeners: list[object] | None = None):
         config.validate()
         self.config = config
         self.rng = rng or random.Random()
+        self._listeners: list[object] = list(listeners or [])
         self.participants = deepcopy(config.participants)
         self.dangos: dict[str, Dango] = {
             dango.id: dango for dango in self.participants
@@ -116,6 +117,7 @@ class RaceEngine:
         self.skip_turns_this_round.clear()
         for dango in self._on_round_start_hooks:
             dango.skill.on_round_start(dango, self.state, self, self.rng)
+            self._emit("skill", dango_id=dango.id, hook_name="on_round_start", state=self.state)
 
     def force_last_next_round(self, dango_id: str) -> None:
         if dango_id in self.normal_ids():
@@ -260,6 +262,7 @@ class RaceEngine:
         dango = self.dangos[dango_id]
         if dango.skill and hasattr(dango.skill, "on_turn_start"):
             dango.skill.on_turn_start(dango, self.state, context, self.rng, self)
+            self._emit("skill", dango_id=dango_id, hook_name="on_turn_start", state=self.state)
             if dango_id in self.skip_turns_this_round:
                 return
         if dango.skill and hasattr(dango.skill, "modify_roll"):
@@ -272,8 +275,10 @@ class RaceEngine:
                     self.rng,
                 )
             )
+            self._emit("skill", dango_id=dango_id, hook_name="modify_roll", state=self.state)
         if dango.skill and hasattr(dango.skill, "before_move"):
             dango.skill.before_move(dango, self.state, context, self.rng)
+            self._emit("skill", dango_id=dango_id, hook_name="before_move", state=self.state)
         if context.blocked or context.movement <= 0:
             return
 
@@ -287,12 +292,15 @@ class RaceEngine:
         context.path = list(path)
         if self.path_passes_start(path):
             self.finish_group_at_start(group)
+            self._emit("finish", group=list(group), position=0, state=self.state)
             self.after_any_move(group, path, dango_id)
             return
         self.move_group_to(group, path[-1], actor_id=dango_id, path=path)
+        self._emit("move", dango_id=dango_id, from_pos=source, to_pos=path[-1], group=list(group), path=list(path), state=self.state)
 
         if dango.skill and hasattr(dango.skill, "after_move"):
             dango.skill.after_move(dango, self.state, context, self.rng, self)
+            self._emit("skill", dango_id=dango_id, hook_name="after_move", state=self.state)
 
     def move_group_to(
         self,
@@ -333,6 +341,7 @@ class RaceEngine:
                 self.rng,
                 self,
             )
+            self._emit("skill", dango_id=dango.id, hook_name="after_group_stacked", state=self.state)
 
     def after_any_move(
         self,
@@ -349,6 +358,7 @@ class RaceEngine:
         )
         for dango in self._after_any_move_hooks:
             dango.skill.after_any_move(dango, self.state, context, self.rng, self)
+            self._emit("skill", dango_id=dango.id, hook_name="after_any_move", state=self.state)
 
     def bu_king_group(self) -> list[str]:
         position = self.state.position_of(BU_KING_ID)
@@ -385,6 +395,7 @@ class RaceEngine:
         final_group = self.bu_king_group()
         self.resolve_tiles(final_group, final_position)
         self.after_any_move(final_group, path, BU_KING_ID)
+        self._emit("bu_king", roll=roll, path=list(path), state=self.state)
 
     def end_round(self) -> None:
         if not self.config.include_bu_king or self.state.round_number < 3:
@@ -431,6 +442,7 @@ class RaceEngine:
             return
 
         next_position = tile.on_landed(group, current, self.state, self.rng)
+        self._emit("tile", group=list(group), position=current, tile=tile, next_position=next_position, state=self.state)
         self.apply_tile_movement(group, current, next_position)
 
     def resolve_chained_tiles(self, group: list[str], position: int) -> None:
@@ -442,6 +454,7 @@ class RaceEngine:
                 return
 
             next_position = tile.on_landed(group, current, self.state, self.rng)
+            self._emit("tile", group=list(group), position=current, tile=tile, next_position=next_position, state=self.state)
             moved_position = self.apply_tile_movement(group, current, next_position)
             if moved_position == current or self.has_finished():
                 return
@@ -481,6 +494,12 @@ class RaceEngine:
     def _invalidate_rankings_cache(self) -> None:
         self._rankings_cache = None
         self._rankings_specials_cache = None
+
+    def _emit(self, event: str, **kwargs) -> None:
+        for listener in self._listeners:
+            handler = getattr(listener, f"on_{event}", None)
+            if handler is not None:
+                handler(**kwargs)
 
     def rankings(self) -> list[str]:
         if self._rankings_cache is None:
