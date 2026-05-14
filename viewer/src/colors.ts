@@ -1,10 +1,18 @@
 export const DANGO_COLORS: Record<string, string> = {
+  carlotta: '#ff6b6b',
+  chisa: '#ffd166',
+  lynae: '#06d6a0',
+  mornye: '#8ecae6',
+  aemeath: '#c77dff',
+  shorekeeper: '#4cc9f0',
   augusta: '#e74c3c',
   iuno: '#3498db',
+  phrolova: '#1abc9c',
   changli: '#2ecc71',
   jinhsi: '#e67e22',
   calcharo: '#9b59b6',
-  phrolova: '#1abc9c',
+  phoebe: '#f78fb3',
+  luuk_herssen: '#95a5a6',
   bu_king: '#f1c40f',
 }
 
