@@ -9,6 +9,7 @@ from dango_sim.models import (
     RaceStartingState,
     RaceState,
 )
+from dango_sim.skills import LuukHerssenSkill
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
 
@@ -326,6 +327,84 @@ def test_inhibitor_tile_wraps_backward_without_finishing():
     assert not engine.has_finished()
     assert engine.state.positions == {4: ["a"]}
     assert -1 not in engine.state.positions
+
+
+def test_luuk_herssen_extends_booster_only_on_own_turn():
+    config = RaceConfig(
+        board=Board(finish=12, tiles={3: Booster()}),
+        participants=[
+            Dango(id="luuk_herssen", name="Luuk Herssen", skill=LuukHerssenSkill()),
+            Dango(id="carrier", name="Carrier"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {2: ["luuk_herssen"], 1: ["carrier"]}
+
+    engine.take_turn("luuk_herssen", base_roll=1, round_rolls={"luuk_herssen": 1, "carrier": 1})
+
+    assert engine.state.position_of("luuk_herssen") == 7
+
+
+def test_luuk_herssen_extends_inhibitor_only_on_own_turn():
+    config = RaceConfig(
+        board=Board(finish=12, tiles={10: Inhibitor()}),
+        participants=[Dango(id="luuk_herssen", name="Luuk Herssen", skill=LuukHerssenSkill())],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {9: ["luuk_herssen"]}
+
+    engine.take_turn("luuk_herssen", base_roll=1, round_rolls={"luuk_herssen": 1})
+
+    assert engine.state.position_of("luuk_herssen") == 8
+
+
+def test_luuk_herssen_does_not_trigger_when_carried_by_another_dango():
+    config = RaceConfig(
+        board=Board(finish=12, tiles={3: Booster()}),
+        participants=[
+            Dango(id="carrier", name="Carrier"),
+            Dango(id="luuk_herssen", name="Luuk Herssen", skill=LuukHerssenSkill()),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {2: ["carrier", "luuk_herssen"]}
+
+    engine.take_turn("carrier", base_roll=1, round_rolls={"carrier": 1, "luuk_herssen": 1})
+
+    assert engine.state.position_of("carrier") == 4
+    assert engine.state.position_of("luuk_herssen") == 4
+
+
+def test_luuk_herssen_extra_single_tile_movement_does_not_chain_by_default():
+    config = RaceConfig(
+        board=Board(finish=12, tiles={3: Booster(), 7: Booster()}),
+        participants=[Dango(id="luuk_herssen", name="Luuk Herssen", skill=LuukHerssenSkill())],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {2: ["luuk_herssen"]}
+
+    engine.take_turn("luuk_herssen", base_roll=1, round_rolls={"luuk_herssen": 1})
+
+    assert engine.state.position_of("luuk_herssen") == 7
+
+
+def test_luuk_herssen_extra_chain_tile_movement_can_continue_chaining():
+    config = RaceConfig(
+        board=Board(finish=12, tiles={3: Booster(), 7: Booster()}),
+        participants=[Dango(id="luuk_herssen", name="Luuk Herssen", skill=LuukHerssenSkill())],
+        include_bu_king=False,
+        tile_resolution="chain",
+    )
+    engine = RaceEngine(config)
+    engine.state.positions = {2: ["luuk_herssen"]}
+
+    engine.take_turn("luuk_herssen", base_roll=1, round_rolls={"luuk_herssen": 1})
+
+    assert engine.state.position_of("luuk_herssen") == 11
 
 
 def test_engine_allows_tile_chain_to_end_at_max_depth():

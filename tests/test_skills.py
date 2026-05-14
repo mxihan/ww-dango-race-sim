@@ -9,13 +9,14 @@ from dango_sim.skills import (
     IunoSkill,
     JinhsiSkill,
     LynaeSkill,
+    LuukHerssenSkill,
     MornyeSkill,
     PhoebeSkill,
     PhrolovaSkill,
     ChisaSkill,
     ShorekeeperSkill,
 )
-from dango_sim.tiles import Booster
+from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
 
 class FixedRng:
@@ -98,6 +99,57 @@ def test_phoebe_keeps_roll_when_probability_misses():
     )
 
     assert movement == 2
+
+
+def test_luuk_herssen_extends_booster_destination():
+    skill = LuukHerssenSkill()
+    context = TurnContext(round_rolls={"luuk_herssen": 1}, base_roll=1, movement=1)
+
+    destination = skill.modify_tile_destination(
+        Dango(id="luuk_herssen", name="Luuk Herssen"),
+        Booster(),
+        3,
+        4,
+        RaceState.initial(["luuk_herssen"]),
+        context,
+        FixedRng(),
+    )
+
+    assert destination == 7
+
+
+def test_luuk_herssen_extends_inhibitor_destination_backward():
+    skill = LuukHerssenSkill()
+    context = TurnContext(round_rolls={"luuk_herssen": 1}, base_roll=1, movement=1)
+
+    destination = skill.modify_tile_destination(
+        Dango(id="luuk_herssen", name="Luuk Herssen"),
+        Inhibitor(),
+        10,
+        9,
+        RaceState.initial(["luuk_herssen"]),
+        context,
+        FixedRng(),
+    )
+
+    assert destination == 8
+
+
+def test_luuk_herssen_ignores_non_booster_inhibitor_tile():
+    skill = LuukHerssenSkill()
+    context = TurnContext(round_rolls={"luuk_herssen": 1}, base_roll=1, movement=1)
+
+    destination = skill.modify_tile_destination(
+        Dango(id="luuk_herssen", name="Luuk Herssen"),
+        SpaceTimeRift(),
+        6,
+        6,
+        RaceState.initial(["luuk_herssen"]),
+        context,
+        FixedRng(),
+    )
+
+    assert destination == 6
 
 
 def test_chisa_adds_two_when_roll_is_round_minimum():

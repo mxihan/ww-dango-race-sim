@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from dango_sim.models import BU_KING_ID, Dango, RaceState
+from dango_sim.tiles import Booster, Inhibitor
 
 
 def _stack_for(dango: Dango, state: RaceState) -> list[str]:
@@ -41,6 +42,28 @@ class PhoebeSkill:
 
     def modify_roll(self, dango: Dango, roll: int, state: RaceState, context, rng) -> int:
         return roll + self.bonus if rng.random() < self.chance else roll
+
+
+@dataclass(frozen=True)
+class LuukHerssenSkill:
+    booster_bonus: int = 3
+    inhibitor_penalty: int = 1
+
+    def modify_tile_destination(
+        self,
+        dango: Dango,
+        tile,
+        current: int,
+        next_position: int,
+        state: RaceState,
+        context,
+        rng,
+    ) -> int:
+        if isinstance(tile, Booster):
+            return next_position + self.booster_bonus
+        if isinstance(tile, Inhibitor):
+            return next_position - self.inhibitor_penalty
+        return next_position
 
 
 @dataclass

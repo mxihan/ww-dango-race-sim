@@ -316,7 +316,7 @@ class RaceEngine:
         self.state.remove_ids(group)
         self.state.place_group(group, destination, bottom=bottom)
         self.after_group_stacked(group, destination, actor_id)
-        self.resolve_tiles(group, destination)
+        self.resolve_tiles(group, destination, actor_id=actor_id)
         self.after_any_move(group, path or [destination], actor_id)
 
     def after_group_stacked(
@@ -393,7 +393,7 @@ class RaceEngine:
 
         final_position = self.state.position_of(BU_KING_ID)
         final_group = self.bu_king_group()
-        self.resolve_tiles(final_group, final_position)
+        self.resolve_tiles(final_group, final_position, actor_id=BU_KING_ID)
         self.after_any_move(final_group, path, BU_KING_ID)
         self._emit("bu_king", roll=roll, path=list(path), state=self.state)
 
@@ -428,24 +428,49 @@ class RaceEngine:
                 return True
         return False
 
-    def resolve_tiles(self, group: list[str], position: int) -> None:
+    def resolve_tiles(
+        self,
+        group: list[str],
+        position: int,
+        *,
+        actor_id: str | None = None,
+    ) -> None:
         if self.config.tile_resolution == "single":
-            self.resolve_single_tile(group, position)
+            self.resolve_single_tile(group, position, actor_id=actor_id)
             return
 
-        self.resolve_chained_tiles(group, position)
+        self.resolve_chained_tiles(group, position, actor_id=actor_id)
 
-    def resolve_single_tile(self, group: list[str], position: int) -> None:
+    def resolve_single_tile(
+        self,
+        group: list[str],
+        position: int,
+        *,
+        actor_id: str | None = None,
+    ) -> None:
         current = self.normalize_position(position)
         tile = self.config.board.tiles.get(current)
         if tile is None:
             return
 
         next_position = tile.on_landed(group, current, self.state, self.rng)
+        next_position = self.modify_tile_destination(
+            actor_id,
+            group,
+            tile,
+            current,
+            next_position,
+        )
         self._emit("tile", group=list(group), position=current, tile=tile, next_position=next_position, state=self.state)
         self.apply_tile_movement(group, current, next_position)
 
-    def resolve_chained_tiles(self, group: list[str], position: int) -> None:
+    def resolve_chained_tiles(
+        self,
+        group: list[str],
+        position: int,
+        *,
+        actor_id: str | None = None,
+    ) -> None:
         current = position
         for _ in range(self.config.max_tile_depth):
             current = self.normalize_position(current)
@@ -454,6 +479,13 @@ class RaceEngine:
                 return
 
             next_position = tile.on_landed(group, current, self.state, self.rng)
+            next_position = self.modify_tile_destination(
+                actor_id,
+                group,
+                tile,
+                current,
+                next_position,
+            )
             self._emit("tile", group=list(group), position=current, tile=tile, next_position=next_position, state=self.state)
             moved_position = self.apply_tile_movement(group, current, next_position)
             if moved_position == current or self.has_finished():
@@ -464,6 +496,43 @@ class RaceEngine:
         if self.config.board.tiles.get(current) is None:
             return
         raise RuntimeError("tile resolution exceeded maximum depth")
+
+    def modify_tile_destination(
+        self,
+        actor_id: str | None,
+        group: list[str],
+        tile,
+        current: int,
+        next_position: int,
+    ) -> int:
+        if actor_id is None or actor_id not in self.dangos:
+            return next_position
+        if actor_id not in group:
+            return next_position
+
+        dango = self.dangos[actor_id]
+        if not dango.skill or not hasattr(dango.skill, "modify_tile_destination"):
+            return next_position
+
+        context = TurnContext(
+            round_rolls={},
+            base_roll=0,
+            movement=0,
+            group=list(group),
+            destination=self.normalize_position(current),
+            engine=self,
+        )
+        modified = dango.skill.modify_tile_destination(
+            dango,
+            tile,
+            current,
+            next_position,
+            self.state,
+            context,
+            self.rng,
+        )
+        self._emit("skill", dango_id=actor_id, hook_name="modify_tile_destination", state=self.state)
+        return int(modified)
 
     def apply_tile_movement(
         self,
