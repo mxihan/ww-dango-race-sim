@@ -35,6 +35,15 @@ class CarlottaSkill:
 
 
 @dataclass
+class PhoebeSkill:
+    chance: float = 0.50
+    bonus: int = 1
+
+    def modify_roll(self, dango: Dango, roll: int, state: RaceState, context, rng) -> int:
+        return roll + self.bonus if rng.random() < self.chance else roll
+
+
+@dataclass
 class ChisaSkill:
     bonus: int = 2
 

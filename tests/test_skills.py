@@ -10,6 +10,7 @@ from dango_sim.skills import (
     JinhsiSkill,
     LynaeSkill,
     MornyeSkill,
+    PhoebeSkill,
     PhrolovaSkill,
     ChisaSkill,
     ShorekeeperSkill,
@@ -67,6 +68,36 @@ def test_carlotta_doubles_roll_when_probability_triggers():
     )
 
     assert movement == 4
+
+
+def test_phoebe_adds_one_when_probability_triggers():
+    skill = PhoebeSkill()
+    context = TurnContext(round_rolls={"phoebe": 2}, base_roll=2, movement=2)
+
+    movement = skill.modify_roll(
+        Dango(id="phoebe", name="Phoebe"),
+        2,
+        RaceState.initial(["phoebe"]),
+        context,
+        FixedRng(randoms=[0.49]),
+    )
+
+    assert movement == 3
+
+
+def test_phoebe_keeps_roll_when_probability_misses():
+    skill = PhoebeSkill()
+    context = TurnContext(round_rolls={"phoebe": 2}, base_roll=2, movement=2)
+
+    movement = skill.modify_roll(
+        Dango(id="phoebe", name="Phoebe"),
+        2,
+        RaceState.initial(["phoebe"]),
+        context,
+        FixedRng(randoms=[0.50]),
+    )
+
+    assert movement == 2
 
 
 def test_chisa_adds_two_when_roll_is_round_minimum():
