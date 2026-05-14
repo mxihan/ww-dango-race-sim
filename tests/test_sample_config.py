@@ -5,6 +5,8 @@ from dango_sim.skills import (
     ChangliSkill,
     IunoSkill,
     JinhsiSkill,
+    LuukHerssenSkill,
+    PhoebeSkill,
     PhrolovaSkill,
 )
 
@@ -20,3 +22,5 @@ def test_sample_config_includes_new_dango_skills():
     assert isinstance(skills_by_id["changli"], ChangliSkill)
     assert isinstance(skills_by_id["jinhsi"], JinhsiSkill)
     assert isinstance(skills_by_id["calcharo"], CalcharoSkill)
+    assert isinstance(skills_by_id["phoebe"], PhoebeSkill)
+    assert isinstance(skills_by_id["luuk_herssen"], LuukHerssenSkill)

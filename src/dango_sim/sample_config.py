@@ -10,8 +10,10 @@ from dango_sim.skills import (
     ChisaSkill,
     IunoSkill,
     JinhsiSkill,
+    LuukHerssenSkill,
     LynaeSkill,
     MornyeSkill,
+    PhoebeSkill,
     PhrolovaSkill,
     ShorekeeperSkill,
 )
@@ -50,6 +52,8 @@ def build_sample_config(starting_state=None) -> RaceConfig:
             Dango(id="changli", name="长离团子", skill=ChangliSkill()),
             Dango(id="jinhsi", name="今汐团子", skill=JinhsiSkill()),
             Dango(id="calcharo", name="卡卡罗团子", skill=CalcharoSkill()),
+            Dango(id="phoebe", name="菲比团子", skill=PhoebeSkill()),
+            Dango(id="luuk_herssen", name="陆·赫斯团子", skill=LuukHerssenSkill()),
         ],
         starting_state=starting_state,
     )
