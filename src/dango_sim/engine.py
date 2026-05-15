@@ -33,6 +33,8 @@ class RaceEngine:
         self.skip_turns_this_round: set[str] = set()
         self.force_last_next_round_ids: set[str] = set()
         self.force_last_this_round_ids: set[str] = set()
+        self.opening_stack_applied = self.config.starting_state is not None
+        self._cached_round_orders: dict[int, list[str]] = {}
         if self.config.starting_state is None:
             self.state = RaceState.empty(self.normal_ids())
         else:
@@ -66,18 +68,8 @@ class RaceEngine:
 
     def run(self) -> RaceResult:
         for round_number in range(1, self.config.max_rounds + 1):
-            self.state.round_number = round_number
-            self.start_round(round_number)
-            actors = [
-                actor_id
-                for actor_id in self.actors_for_round(round_number)
-                if actor_id not in self.skip_turns_this_round
-            ]
-            self._round_order_actors = actors
-            try:
-                order = self.build_round_order(round_number)
-            finally:
-                del self._round_order_actors
+            order = self.prepare_round(round_number)
+            actors = self.actors_after_round_start(round_number)
             round_rolls = self.roll_round_values(actors)
 
             for dango_id in order:
@@ -109,6 +101,55 @@ class RaceEngine:
     def normal_ids(self) -> list[str]:
         return [
             dango.id for dango in self.participants if not dango.is_special
+        ]
+
+    def prepare_round(self, round_number: int) -> list[str]:
+        self.state.round_number = round_number
+        actors = self.actors_for_round(round_number)
+        if round_number == 1 and not self.opening_stack_applied:
+            self._round_order_actors = actors
+            try:
+                order = self.build_round_order(round_number)
+            finally:
+                del self._round_order_actors
+            self._cached_round_orders[round_number] = list(order)
+            self.apply_default_opening_stack(order)
+        self.start_round(round_number)
+
+        actors = self.actors_after_round_start(round_number)
+        if round_number in self._cached_round_orders:
+            order = [
+                actor_id
+                for actor_id in self._cached_round_orders[round_number]
+                if actor_id in actors
+            ]
+        else:
+            self._round_order_actors = actors
+            try:
+                order = self.build_round_order(round_number)
+            finally:
+                del self._round_order_actors
+        self._cached_round_orders[round_number] = list(order)
+        return order
+
+    def apply_default_opening_stack(self, order: list[str]) -> None:
+        normal_ids = set(self.normal_ids())
+        stack = [
+            dango_id
+            for dango_id in reversed(order)
+            if dango_id in normal_ids
+        ]
+        if stack:
+            self.state.place_group(stack, 0)
+            for dango_id in stack:
+                self.state.laps_completed.setdefault(dango_id, 0)
+        self.opening_stack_applied = True
+
+    def actors_after_round_start(self, round_number: int) -> list[str]:
+        return [
+            actor_id
+            for actor_id in self.actors_for_round(round_number)
+            if actor_id not in self.skip_turns_this_round
         ]
 
     def start_round(self, round_number: int) -> None:
@@ -151,6 +192,9 @@ class RaceEngine:
         round_number: int,
         actors: Iterable[str] | None = None,
     ) -> list[str]:
+        cached_order = self._cached_round_orders.get(round_number)
+        if cached_order is not None and actors is None:
+            return self.apply_forced_last(list(cached_order))
         if actors is None:
             actors = getattr(
                 self,
@@ -287,6 +331,20 @@ class RaceEngine:
 
         source = self.state.position_of(dango_id)
         group = self.state.lift_group_from(dango_id)
+        skipped_group = [
+            group_id
+            for group_id in group
+            if group_id in self.skip_turns_this_round
+        ]
+        if skipped_group:
+            group = [
+                group_id
+                for group_id in group
+                if group_id not in self.skip_turns_this_round
+            ]
+            self.state.place_group(skipped_group, source)
+        if not group:
+            return
         path = self.forward_path(source, context.movement)
         context.group = list(group)
         context.path = list(path)
@@ -334,6 +392,8 @@ class RaceEngine:
             engine=self,
         )
         for dango in self._after_group_stacked_hooks:
+            if dango.id in self.skip_turns_this_round:
+                continue
             dango.skill.after_group_stacked(
                 dango,
                 self.state,
@@ -357,6 +417,8 @@ class RaceEngine:
             group=list(group),
         )
         for dango in self._after_any_move_hooks:
+            if dango.id in self.skip_turns_this_round:
+                continue
             dango.skill.after_any_move(dango, self.state, context, self.rng, self)
             self._emit("skill", dango_id=dango.id, hook_name="after_any_move", state=self.state)
 
@@ -380,19 +442,29 @@ class RaceEngine:
             source = self.state.position_of(BU_KING_ID)
             destination = self.previous_position(source)
             carried_group = self.bu_king_group()
-            carried_above_bu_king = carried_group[1:]
+            carried_above_bu_king = [
+                dango_id
+                for dango_id in carried_group[1:]
+                if dango_id not in self.skip_turns_this_round
+            ]
             destination_stack = self.state.stack_at(destination)
 
-            self.state.remove_ids(carried_group)
+            self.state.remove_ids([BU_KING_ID, *carried_above_bu_king])
             self.state.positions[destination] = [
                 BU_KING_ID,
                 *destination_stack,
                 *carried_above_bu_king,
             ]
+            self.state._rebuild_index()
             path.append(destination)
 
         final_position = self.state.position_of(BU_KING_ID)
-        final_group = self.bu_king_group()
+        final_group = [
+            dango_id
+            for dango_id in self.bu_king_group()
+            if dango_id == BU_KING_ID
+            or dango_id not in self.skip_turns_this_round
+        ]
         self.resolve_tiles(final_group, final_position, actor_id=BU_KING_ID)
         self.after_any_move(final_group, path, BU_KING_ID)
         self._emit("bu_king", roll=roll, path=list(path), state=self.state)
@@ -453,7 +525,7 @@ class RaceEngine:
         if tile is None:
             return
 
-        next_position = tile.on_landed(group, current, self.state, self.rng)
+        next_position = self.apply_tile_effect(tile, group, current)
         next_position = self.modify_tile_destination(
             actor_id,
             group,
@@ -478,7 +550,7 @@ class RaceEngine:
             if tile is None:
                 return
 
-            next_position = tile.on_landed(group, current, self.state, self.rng)
+            next_position = self.apply_tile_effect(tile, group, current)
             next_position = self.modify_tile_destination(
                 actor_id,
                 group,
@@ -496,6 +568,41 @@ class RaceEngine:
         if self.config.board.tiles.get(current) is None:
             return
         raise RuntimeError("tile resolution exceeded maximum depth")
+
+    def apply_tile_effect(self, tile, group: list[str], current: int) -> int:
+        frozen = self.extract_skipped_tile_members(current)
+        try:
+            next_position = tile.on_landed(group, current, self.state, self.rng)
+        finally:
+            self.restore_frozen_skipped_tile_members(current, frozen)
+        return next_position
+
+    def extract_skipped_tile_members(self, position: int) -> list[tuple[int, str]]:
+        if not self.skip_turns_this_round:
+            return []
+        frozen = [
+            (index, dango_id)
+            for index, dango_id in enumerate(self.state.stack_at(position))
+            if dango_id in self.skip_turns_this_round
+        ]
+        if frozen:
+            self.state.remove_ids([dango_id for _, dango_id in frozen])
+        return frozen
+
+    def restore_frozen_skipped_tile_members(
+        self,
+        position: int,
+        frozen: list[tuple[int, str]],
+    ) -> None:
+        if not frozen:
+            return
+
+        skipped_ids = [dango_id for _, dango_id in frozen]
+        self.state.remove_ids(skipped_ids)
+        stack = self.state.positions.setdefault(position, [])
+        for index, dango_id in sorted(frozen):
+            stack.insert(min(index, len(stack)), dango_id)
+        self.state._rebuild_index()
 
     def modify_tile_destination(
         self,

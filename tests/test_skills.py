@@ -690,8 +690,8 @@ def test_augusta_skips_current_round_when_round_starts_on_top_of_stack():
     for dango_id in order:
         engine.take_turn(dango_id, base_roll=round_rolls[dango_id], round_rolls=round_rolls)
 
-    assert engine.state.stack_at(2) == []
-    assert engine.state.stack_at(3) == ["base", "augusta"]
+    assert engine.state.stack_at(2) == ["augusta"]
+    assert engine.state.stack_at(3) == ["base"]
     assert engine.force_last_next_round_ids == {"augusta"}
 
 
@@ -758,7 +758,7 @@ def test_run_loop_skips_dango_marked_to_skip_this_round():
     assert "skipped" not in engine.state.finished_group
 
 
-def test_run_loop_does_not_roll_skipped_stateful_skill():
+def test_run_loop_only_rolls_skipped_stateful_skill_for_opening_order():
     skill = StatefulSkipRoundStartSkill()
     config = RaceConfig(
         board=Board(finish=1),
@@ -773,7 +773,7 @@ def test_run_loop_does_not_roll_skipped_stateful_skill():
     result = engine.run()
 
     assert result.winner_id == "winner"
-    assert engine.dangos["skipped"].skill.index == 0
+    assert engine.dangos["skipped"].skill.index == 1
 
 
 def test_on_turn_start_can_skip_before_movement():

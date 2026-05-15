@@ -506,6 +506,180 @@ def test_bu_king_starts_moving_on_round_three():
     assert engine.state.positions == {7: [BU_KING_ID, "a"]}
 
 
+def test_bu_king_does_not_carry_dango_skipped_at_round_start():
+    class SkipAtRoundStartSkill:
+        def on_round_start(self, dango, state, engine, rng) -> None:
+            engine.skip_turn_this_round(dango.id)
+
+    config = RaceConfig(
+        board=Board(finish=8),
+        participants=[
+            Dango(id="skipped", name="Skipped", skill=SkipAtRoundStartSkill()),
+        ],
+    )
+    engine = RaceEngine(config)
+    engine.state = RaceState(
+        positions={5: [BU_KING_ID, "skipped"]},
+        round_number=3,
+        laps_completed={"skipped": 0},
+    )
+    engine.start_round(3)
+
+    engine.take_bu_king_turn(base_roll=1)
+
+    assert engine.state.positions == {5: ["skipped"], 4: [BU_KING_ID]}
+
+
+def test_bu_king_tile_resolution_excludes_dango_skipped_at_round_start():
+    class SkipAtRoundStartSkill:
+        def on_round_start(self, dango, state, engine, rng) -> None:
+            engine.skip_turn_this_round(dango.id)
+
+    config = RaceConfig(
+        board=Board(finish=8, tiles={4: Booster()}),
+        participants=[
+            Dango(id="skipped", name="Skipped", skill=SkipAtRoundStartSkill()),
+        ],
+    )
+    engine = RaceEngine(config)
+    engine.state = RaceState(
+        positions={5: [BU_KING_ID], 4: ["skipped"]},
+        round_number=3,
+        laps_completed={"skipped": 0},
+    )
+    engine.start_round(3)
+
+    engine.take_bu_king_turn(base_roll=1)
+
+    assert engine.state.positions == {5: [BU_KING_ID], 4: ["skipped"]}
+
+
+def test_bu_king_space_time_rift_does_not_reorder_skipped_dango_at_round_start():
+    class ReverseShuffleRng:
+        def shuffle(self, values):
+            values.reverse()
+
+    class SkipAtRoundStartSkill:
+        def on_round_start(self, dango, state, engine, rng) -> None:
+            engine.skip_turn_this_round(dango.id)
+
+    config = RaceConfig(
+        board=Board(finish=8, tiles={4: SpaceTimeRift()}),
+        participants=[
+            Dango(id="normal", name="Normal"),
+            Dango(id="skipped", name="Skipped", skill=SkipAtRoundStartSkill()),
+        ],
+    )
+    engine = RaceEngine(config, ReverseShuffleRng())
+    engine.state = RaceState(
+        positions={5: [BU_KING_ID], 4: ["normal", "skipped"]},
+        round_number=3,
+        laps_completed={"normal": 0, "skipped": 0},
+    )
+    engine.start_round(3)
+
+    engine.take_bu_king_turn(base_roll=1)
+
+    assert engine.state.positions == {4: [BU_KING_ID, "normal", "skipped"]}
+
+
+def test_bu_king_space_time_rift_shuffles_non_skipped_as_if_skipped_absent():
+    class SkipSensitiveRng:
+        def shuffle(self, values):
+            if values == ["bottom", "top"]:
+                values[:] = ["top", "bottom"]
+            else:
+                values[:] = ["bottom", "top", "skipped"]
+
+    class SkipAtRoundStartSkill:
+        def on_round_start(self, dango, state, engine, rng) -> None:
+            engine.skip_turn_this_round(dango.id)
+
+    config = RaceConfig(
+        board=Board(finish=8, tiles={4: SpaceTimeRift()}),
+        participants=[
+            Dango(id="bottom", name="Bottom"),
+            Dango(id="top", name="Top"),
+            Dango(id="skipped", name="Skipped", skill=SkipAtRoundStartSkill()),
+        ],
+    )
+    engine = RaceEngine(config, SkipSensitiveRng())
+    engine.state = RaceState(
+        positions={5: [BU_KING_ID], 4: ["bottom", "skipped", "top"]},
+        round_number=3,
+        laps_completed={"bottom": 0, "top": 0, "skipped": 0},
+    )
+    engine.start_round(3)
+
+    engine.take_bu_king_turn(base_roll=1)
+
+    assert engine.state.positions == {
+        4: [BU_KING_ID, "top", "skipped", "bottom"]
+    }
+
+
+def test_after_any_move_does_not_dispatch_to_dango_skipped_at_round_start():
+    class SkippedAfterAnyMoveSkill:
+        def __init__(self):
+            self.calls = 0
+
+        def on_round_start(self, dango, state, engine, rng) -> None:
+            engine.skip_turn_this_round(dango.id)
+
+        def after_any_move(self, dango, state, context, rng, engine) -> None:
+            self.calls += 1
+
+    config = RaceConfig(
+        board=Board(finish=8),
+        participants=[
+            Dango(id="skipped", name="Skipped", skill=SkippedAfterAnyMoveSkill()),
+        ],
+    )
+    engine = RaceEngine(config)
+    engine.state = RaceState(
+        positions={5: [BU_KING_ID], 4: ["skipped"]},
+        round_number=3,
+        laps_completed={"skipped": 0},
+    )
+    engine.start_round(3)
+
+    engine.take_bu_king_turn(base_roll=1)
+
+    assert engine.dangos["skipped"].skill.calls == 0
+
+
+def test_after_group_stacked_does_not_dispatch_to_dango_skipped_at_round_start():
+    class SkippedAfterGroupStackedSkill:
+        def __init__(self):
+            self.calls = 0
+
+        def on_round_start(self, dango, state, engine, rng) -> None:
+            engine.skip_turn_this_round(dango.id)
+
+        def after_group_stacked(self, dango, state, context, rng, engine) -> None:
+            self.calls += 1
+
+    config = RaceConfig(
+        board=Board(finish=8),
+        participants=[
+            Dango(id="mover", name="Mover"),
+            Dango(id="skipped", name="Skipped", skill=SkippedAfterGroupStackedSkill()),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config)
+    engine.state = RaceState(
+        positions={0: ["mover"], 4: ["skipped"]},
+        round_number=1,
+        laps_completed={"mover": 0, "skipped": 0},
+    )
+    engine.start_round(1)
+
+    engine.take_turn("mover", base_roll=1, round_rolls={"mover": 1})
+
+    assert engine.dangos["skipped"].skill.calls == 0
+
+
 def test_bu_king_moves_backward_stepwise_and_carries_contacted_dango():
     config = RaceConfig(
         board=Board(finish=8),
