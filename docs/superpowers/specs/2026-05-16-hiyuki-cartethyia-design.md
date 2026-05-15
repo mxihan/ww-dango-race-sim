@@ -42,6 +42,7 @@ class HiyukiSkill:
 - `triggered` is `False`
 - Cartethyia is ranked last among all normal participants (excluding `bu_king`)
 - Ranking is determined by `state.positions` — highest position value = furthest ahead; lowest = last
+- Tied for last (sharing the lowest position with others) also counts as "last"
 
 **Trigger is deterministic**: the check always runs; only the per-turn bonus is probabilistic.
 
