@@ -46,6 +46,11 @@ The core API accepts a fresh `RaceConfig` per simulation, so callers can vary pa
 
 ## Starting states
 
+When no `--starting-state` file is supplied, the first round rolls action
+order first, places all normal dangos on position `0`, and starts the race from
+that stack. The first actor in the first-round order is placed on top of the
+stack. Round-start skills then run before any dango moves.
+
 Second-half simulations can start from an editable JSON file:
 
 ```json
