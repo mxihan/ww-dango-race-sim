@@ -119,10 +119,16 @@ class AugustaSkill:
 @dataclass
 class PhrolovaSkill:
     bonus: int = 3
+    pending_round: int | None = None
+
+    def on_round_start(self, dango: Dango, state: RaceState, engine, rng) -> None:
+        if _is_bottom(dango, state):
+            self.pending_round = state.round_number
 
     def before_move(self, dango: Dango, state: RaceState, context, rng) -> None:
-        if _is_bottom(dango, state):
+        if self.pending_round == state.round_number:
             context.movement += self.bonus
+            self.pending_round = None
 
 
 @dataclass

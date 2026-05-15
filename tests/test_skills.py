@@ -791,14 +791,20 @@ def test_on_turn_start_can_skip_before_movement():
     assert engine.state.positions == {}
 
 
-def test_phrolova_gains_three_when_bottom_with_rider_above():
+def test_phrolova_records_bonus_at_round_start_when_bottom_with_rider_above():
     skill = PhrolovaSkill()
-    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
-    state = RaceState(positions={4: ["phrolova", "rider"]})
+    state = RaceState(positions={4: ["phrolova", "rider"]}, round_number=2)
 
-    skill.before_move(
+    skill.on_round_start(
         Dango(id="phrolova", name="Phrolova"),
         state,
+        engine=None,
+        rng=FixedRng(),
+    )
+    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
+    skill.before_move(
+        Dango(id="phrolova", name="Phrolova"),
+        RaceState(positions={6: ["rider"], 8: ["phrolova"]}, round_number=2),
         context,
         FixedRng(),
     )
@@ -806,47 +812,54 @@ def test_phrolova_gains_three_when_bottom_with_rider_above():
     assert context.movement == 5
 
 
-def test_phrolova_does_not_gain_bonus_when_alone_in_stack():
+def test_phrolova_consumes_round_start_bonus_once():
     skill = PhrolovaSkill()
-    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
-    state = RaceState(positions={4: ["phrolova"]})
+    state = RaceState(positions={4: ["phrolova", "rider"]}, round_number=2)
+    dango = Dango(id="phrolova", name="Phrolova")
+    skill.on_round_start(dango, state, engine=None, rng=FixedRng())
 
-    skill.before_move(
-        Dango(id="phrolova", name="Phrolova"),
-        state,
-        context,
-        FixedRng(),
-    )
+    first = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
+    second = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
+    skill.before_move(dango, state, first, FixedRng())
+    skill.before_move(dango, state, second, FixedRng())
+
+    assert first.movement == 5
+    assert second.movement == 2
+
+
+def test_phrolova_does_not_record_bonus_when_alone_in_stack():
+    skill = PhrolovaSkill()
+    state = RaceState(positions={4: ["phrolova"]}, round_number=2)
+    dango = Dango(id="phrolova", name="Phrolova")
+    skill.on_round_start(dango, state, engine=None, rng=FixedRng())
+
+    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
+    skill.before_move(dango, state, context, FixedRng())
 
     assert context.movement == 2
 
 
-def test_phrolova_does_not_gain_bonus_when_not_bottom():
+def test_phrolova_does_not_record_bonus_when_not_bottom():
     skill = PhrolovaSkill()
-    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
-    state = RaceState(positions={4: ["base", "phrolova"]})
+    state = RaceState(positions={4: ["base", "phrolova"]}, round_number=2)
+    dango = Dango(id="phrolova", name="Phrolova")
+    skill.on_round_start(dango, state, engine=None, rng=FixedRng())
 
-    skill.before_move(
-        Dango(id="phrolova", name="Phrolova"),
-        state,
-        context,
-        FixedRng(),
-    )
+    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
+    skill.before_move(dango, state, context, FixedRng())
 
     assert context.movement == 2
 
 
-def test_phrolova_does_not_gain_bonus_when_unentered():
+def test_phrolova_does_not_record_bonus_when_unentered():
     skill = PhrolovaSkill()
-    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
     state = RaceState.empty(["phrolova"])
+    state.round_number = 2
+    dango = Dango(id="phrolova", name="Phrolova")
+    skill.on_round_start(dango, state, engine=None, rng=FixedRng())
 
-    skill.before_move(
-        Dango(id="phrolova", name="Phrolova"),
-        state,
-        context,
-        FixedRng(),
-    )
+    context = TurnContext(round_rolls={"phrolova": 2}, base_roll=2, movement=2)
+    skill.before_move(dango, state, context, FixedRng())
 
     assert context.movement == 2
 

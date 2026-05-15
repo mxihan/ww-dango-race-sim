@@ -9,7 +9,7 @@ from dango_sim.models import (
     RaceStartingState,
     RaceState,
 )
-from dango_sim.skills import LuukHerssenSkill
+from dango_sim.skills import LuukHerssenSkill, PhrolovaSkill
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
 
@@ -912,6 +912,23 @@ def test_opening_stack_reuses_first_round_order_rolls_for_actual_turn_order():
     assert engine.build_round_order(1) == ["first", "second"]
     assert engine.dangos["first"].skill.rolls == 1
     assert engine.dangos["second"].skill.rolls == 1
+
+
+def test_opening_stack_can_trigger_phrolova_round_start_bonus():
+    config = RaceConfig(
+        board=Board(finish=4),
+        participants=[
+            Dango(id="top", name="Top", skill=RecordingOrderSkill(3)),
+            Dango(id="phrolova", name="Phrolova", skill=PhrolovaSkill()),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([1, 1, 1]))
+
+    result = engine.run()
+
+    assert result.winner_id == "phrolova"
+    assert result.rounds == 1
 
 
 def test_starting_state_does_not_apply_default_opening_stack():
