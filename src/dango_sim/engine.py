@@ -118,11 +118,13 @@ class RaceEngine:
 
         actors = self.actors_after_round_start(round_number)
         if round_number in self._cached_round_orders:
-            order = [
-                actor_id
-                for actor_id in self._cached_round_orders[round_number]
-                if actor_id in actors
-            ]
+            order = self.apply_forced_last(
+                [
+                    actor_id
+                    for actor_id in self._cached_round_orders[round_number]
+                    if actor_id in actors
+                ]
+            )
         else:
             self._round_order_actors = actors
             try:

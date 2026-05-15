@@ -914,6 +914,29 @@ def test_opening_stack_reuses_first_round_order_rolls_for_actual_turn_order():
     assert engine.dangos["second"].skill.rolls == 1
 
 
+def test_opening_stack_cached_first_round_order_applies_preexisting_forced_last():
+    forced_skill = RecordingOrderSkill(3)
+    other_skill = RecordingOrderSkill(1)
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="forced", name="Forced", skill=forced_skill),
+            Dango(id="other", name="Other", skill=other_skill),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([1, 1]))
+    engine.force_last_next_round("forced")
+
+    engine.state.round_number = 1
+    order = engine.prepare_round(1)
+
+    assert order == ["other", "forced"]
+    assert engine.build_round_order(1) == ["other", "forced"]
+    assert engine.dangos["forced"].skill.rolls == 1
+    assert engine.dangos["other"].skill.rolls == 1
+
+
 def test_opening_stack_can_trigger_phrolova_round_start_bonus():
     config = RaceConfig(
         board=Board(finish=4),
