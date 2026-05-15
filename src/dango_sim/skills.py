@@ -313,3 +313,27 @@ class HiyukiSkill:
     def before_move(self, dango: Dango, state: RaceState, context, rng) -> None:
         if self.encountered_bu_king:
             context.movement += 1
+
+
+@dataclass
+class CartethyiaSkill:
+    triggered: bool = False
+    chance: float = 0.60
+    bonus: int = 2
+
+    def after_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+        if self.triggered:
+            return
+        if not state.is_entered(dango.id):
+            return
+        my_distance = engine.forward_distance_to_start(state.position_of(dango.id))
+        for other_id in engine.normal_ids():
+            if other_id == dango.id or not state.is_entered(other_id):
+                continue
+            if engine.forward_distance_to_start(state.position_of(other_id)) > my_distance:
+                return
+        self.triggered = True
+
+    def before_move(self, dango: Dango, state: RaceState, context, rng) -> None:
+        if self.triggered and rng.random() < self.chance:
+            context.movement += self.bonus

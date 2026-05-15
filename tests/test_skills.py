@@ -5,6 +5,7 @@ from dango_sim.skills import (
     AugustaSkill,
     CalcharoSkill,
     CarlottaSkill,
+    CartethyiaSkill,
     ChangliSkill,
     HiyukiSkill,
     IunoSkill,
@@ -1168,3 +1169,120 @@ def test_hiyuki_bonus_persists_after_encounter():
 
     engine.take_turn("hiyuki", base_roll=2, round_rolls={"hiyuki": 2, "other": 1})
     assert engine.state.stack_at(10) == ["other", "hiyuki"]
+
+
+def test_cartethyia_triggers_when_last_after_own_move():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="leader", name="Leader"),
+            Dango(id="middle", name="Middle"),
+            Dango(id="cartethyia", name="卡提希娅团子", skill=CartethyiaSkill()),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={8: ["leader"], 5: ["middle"], 2: ["cartethyia"]})
+
+    engine.take_turn(
+        "cartethyia",
+        base_roll=1,
+        round_rolls={"leader": 1, "middle": 1, "cartethyia": 1},
+    )
+
+    assert engine.dangos["cartethyia"].skill.triggered is True
+
+
+def test_cartethyia_does_not_trigger_when_not_last():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="cartethyia", name="卡提希娅团子", skill=CartethyiaSkill()),
+            Dango(id="middle", name="Middle"),
+            Dango(id="trailer", name="Trailer"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(
+        positions={8: ["cartethyia"], 5: ["middle"], 2: ["trailer"]}
+    )
+
+    engine.take_turn(
+        "cartethyia",
+        base_roll=1,
+        round_rolls={"cartethyia": 1, "middle": 1, "trailer": 1},
+    )
+
+    assert engine.dangos["cartethyia"].skill.triggered is False
+
+
+def test_cartethyia_gains_bonus_when_triggered_and_lucky():
+    skill = CartethyiaSkill(triggered=True)
+    context = TurnContext(round_rolls={"c": 2}, base_roll=2, movement=2)
+
+    skill.before_move(
+        Dango(id="c", name="Cartethyia"),
+        RaceState.initial(["c"]),
+        context,
+        FixedRng(randoms=[0.59]),
+    )
+
+    assert context.movement == 4
+
+
+def test_cartethyia_no_bonus_when_unlucky():
+    skill = CartethyiaSkill(triggered=True)
+    context = TurnContext(round_rolls={"c": 2}, base_roll=2, movement=2)
+
+    skill.before_move(
+        Dango(id="c", name="Cartethyia"),
+        RaceState.initial(["c"]),
+        context,
+        FixedRng(randoms=[0.60]),
+    )
+
+    assert context.movement == 2
+
+
+def test_cartethyia_triggers_only_once():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="leader", name="Leader"),
+            Dango(id="cartethyia", name="卡提希娅团子", skill=CartethyiaSkill()),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng(randoms=[0.50, 0.50]))
+    engine.state = RaceState(positions={10: ["leader"], 2: ["cartethyia"]})
+
+    engine.take_turn(
+        "cartethyia", base_roll=1, round_rolls={"leader": 1, "cartethyia": 1}
+    )
+    assert engine.dangos["cartethyia"].skill.triggered is True
+
+    engine.take_turn(
+        "cartethyia", base_roll=1, round_rolls={"leader": 1, "cartethyia": 1}
+    )
+    assert engine.dangos["cartethyia"].skill.triggered is True
+
+
+def test_cartethyia_excludes_bu_king_from_ranking():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="leader", name="Leader"),
+            Dango(id="cartethyia", name="卡提希娅团子", skill=CartethyiaSkill()),
+        ],
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(
+        positions={10: ["leader"], 2: ["cartethyia"], 1: [BU_KING_ID]}
+    )
+
+    engine.take_turn(
+        "cartethyia", base_roll=1, round_rolls={"leader": 1, "cartethyia": 1}
+    )
+
+    assert engine.dangos["cartethyia"].skill.triggered is True
