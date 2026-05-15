@@ -36,6 +36,24 @@ class RecordingRollsSkill:
         return movement
 
 
+class RecordingRoundStartSkill:
+    def __init__(self):
+        self.observed_stacks = []
+
+    def on_round_start(self, dango, state, engine, rng):
+        self.observed_stacks.append(state.stack_at(0))
+
+
+class RecordingOrderSkill:
+    def __init__(self, value):
+        self.value = value
+        self.rolls = 0
+
+    def roll(self, dango, state, rng):
+        self.rolls += 1
+        return self.value
+
+
 def test_normal_dango_reaching_finish_ends_race_immediately():
     config = RaceConfig(
         board=Board(finish=3),
@@ -677,6 +695,74 @@ def test_round_order_can_use_low_first_order_rolls():
     order = engine.order_actors(engine.roll_order_values(["a", "b"], round_number=1))
 
     assert order == ["b", "a"]
+
+
+def test_no_starting_state_opening_stack_uses_first_round_order_before_round_start():
+    probe = RecordingRoundStartSkill()
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="first", name="First", skill=RecordingOrderSkill(3)),
+            Dango(id="middle", name="Middle", skill=RecordingOrderSkill(2)),
+            Dango(id="last", name="Last", skill=probe),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([1, 1, 1]))
+
+    engine.state.round_number = 1
+    order = engine.prepare_round(1)
+
+    assert order == ["first", "middle", "last"]
+    assert engine.state.stack_at(0) == ["last", "middle", "first"]
+    assert engine.dangos["last"].skill.observed_stacks == [["last", "middle", "first"]]
+
+
+def test_opening_stack_reuses_first_round_order_rolls_for_actual_turn_order():
+    first_skill = RecordingOrderSkill(3)
+    second_skill = RecordingOrderSkill(1)
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="first", name="First", skill=first_skill),
+            Dango(id="second", name="Second", skill=second_skill),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([1, 1]))
+
+    engine.state.round_number = 1
+    order = engine.prepare_round(1)
+
+    assert order == ["first", "second"]
+    assert engine.build_round_order(1) == ["first", "second"]
+    assert engine.dangos["first"].skill.rolls == 1
+    assert engine.dangos["second"].skill.rolls == 1
+
+
+def test_starting_state_does_not_apply_default_opening_stack():
+    starting_state = RaceStartingState(
+        positions={4: ["a"], 5: ["b"]},
+        laps_completed={"a": 0, "b": 0},
+    )
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="a", name="A", skill=RecordingOrderSkill(3)),
+            Dango(id="b", name="B", skill=RecordingOrderSkill(1)),
+        ],
+        include_bu_king=False,
+        starting_state=starting_state,
+    )
+    engine = RaceEngine(config, rng=FixedRng([1, 1]))
+
+    engine.state.round_number = 1
+    order = engine.prepare_round(1)
+
+    assert order == ["a", "b"]
+    assert engine.state.stack_at(0) == []
+    assert engine.state.stack_at(4) == ["a"]
+    assert engine.state.stack_at(5) == ["b"]
 
 
 def test_bu_king_absent_from_turn_order_when_excluded():
