@@ -11,6 +11,8 @@ export const DANGO_COLORS: Record<string, string> = {
   changli: '#2ecc71',
   jinhsi: '#e67e22',
   calcharo: '#9b59b6',
+  hiyuki: '#b3e0ff',
+  cartethyia: '#4a5568',
   phoebe: '#f78fb3',
   luuk_herssen: '#95a5a6',
   bu_king: '#f1c40f',
