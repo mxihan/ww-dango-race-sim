@@ -6,6 +6,7 @@ from dango_sim.skills import (
     CalcharoSkill,
     CarlottaSkill,
     ChangliSkill,
+    HiyukiSkill,
     IunoSkill,
     JinhsiSkill,
     LynaeSkill,
@@ -1079,3 +1080,91 @@ def test_calcharo_uses_engine_context_during_turn_movement():
     )
 
     assert engine.state.stack_at(7) == ["calcharo"]
+
+
+def test_hiyuki_encounters_bu_king_when_path_passes_through():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="hiyuki", name="绯雪团子", skill=HiyukiSkill()),
+            Dango(id="other", name="Other"),
+        ],
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={3: ["hiyuki"], 5: [BU_KING_ID], 10: ["other"]})
+
+    engine.take_turn("hiyuki", base_roll=4, round_rolls={"hiyuki": 4, "other": 1})
+
+    assert engine.dangos["hiyuki"].skill.encountered_bu_king is True
+
+
+def test_hiyuki_encounters_bu_king_when_landing_on_same_position():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="hiyuki", name="绯雪团子", skill=HiyukiSkill()),
+            Dango(id="other", name="Other"),
+        ],
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={3: ["hiyuki"], 5: [BU_KING_ID], 10: ["other"]})
+
+    engine.take_turn("hiyuki", base_roll=2, round_rolls={"hiyuki": 2, "other": 1})
+
+    assert engine.dangos["hiyuki"].skill.encountered_bu_king is True
+
+
+def test_hiyuki_encounters_bu_king_when_carried_to_bu_king():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="carrier", name="Carrier"),
+            Dango(id="hiyuki", name="绯雪团子", skill=HiyukiSkill()),
+            Dango(id="other", name="Other"),
+        ],
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(
+        positions={5: ["carrier", "hiyuki"], 8: [BU_KING_ID], 10: ["other"]}
+    )
+
+    engine.take_turn(
+        "carrier", base_roll=3, round_rolls={"carrier": 3, "hiyuki": 1, "other": 1}
+    )
+
+    assert engine.dangos["hiyuki"].skill.encountered_bu_king is True
+
+
+def test_hiyuki_no_encounter_without_bu_king_contact():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="hiyuki", name="绯雪团子", skill=HiyukiSkill()),
+            Dango(id="other", name="Other"),
+        ],
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={3: ["hiyuki"], 10: [BU_KING_ID], 5: ["other"]})
+
+    engine.take_turn("hiyuki", base_roll=2, round_rolls={"hiyuki": 2, "other": 1})
+
+    assert engine.dangos["hiyuki"].skill.encountered_bu_king is False
+
+
+def test_hiyuki_bonus_persists_after_encounter():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="hiyuki", name="绯雪团子", skill=HiyukiSkill()),
+            Dango(id="other", name="Other"),
+        ],
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={3: ["hiyuki"], 5: [BU_KING_ID], 10: ["other"]})
+
+    engine.take_turn("hiyuki", base_roll=4, round_rolls={"hiyuki": 4, "other": 1})
+    assert engine.dangos["hiyuki"].skill.encountered_bu_king is True
+    assert engine.state.stack_at(7) == ["hiyuki"]
+
+    engine.take_turn("hiyuki", base_roll=2, round_rolls={"hiyuki": 2, "other": 1})
+    assert engine.state.stack_at(10) == ["other", "hiyuki"]

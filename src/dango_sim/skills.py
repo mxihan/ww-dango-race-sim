@@ -288,3 +288,28 @@ class IunoSkill:
             state.remove_ids(selected)
             state.place_group(list(reversed(selected)), position)
         self.used = True
+
+
+@dataclass
+class HiyukiSkill:
+    encountered_bu_king: bool = False
+
+    def after_any_move(self, dango: Dango, state: RaceState, context, rng, engine) -> None:
+        if self.encountered_bu_king:
+            return
+        if not state.is_entered(BU_KING_ID):
+            return
+
+        bu_king_pos = state.position_of(BU_KING_ID)
+
+        if state.is_entered(dango.id) and state.position_of(dango.id) == bu_king_pos:
+            self.encountered_bu_king = True
+            return
+
+        group = getattr(context, "group", [])
+        if dango.id in group and bu_king_pos in getattr(context, "path", []):
+            self.encountered_bu_king = True
+
+    def before_move(self, dango: Dango, state: RaceState, context, rng) -> None:
+        if self.encountered_bu_king:
+            context.movement += 1
