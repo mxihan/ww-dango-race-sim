@@ -5,9 +5,11 @@ from dango_sim.skills import (
     AugustaSkill,
     CalcharoSkill,
     CartethyiaSkill,
+    DeniaSkill,
     HiyukiSkill,
     IunoSkill,
     JinhsiSkill,
+    SigrikaSkill,
 )
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
@@ -38,6 +40,8 @@ def build_sample_config(starting_state=None) -> RaceConfig:
             Dango(id="iuno", name="尤诺团子", skill=IunoSkill()),
             Dango(id="calcharo", name="卡卡罗团子", skill=CalcharoSkill()),
             Dango(id="cartethyia", name="卡提希娅团子", skill=CartethyiaSkill()),
+            Dango(id="denia", name="达妮娅团子", skill=DeniaSkill()),
+            Dango(id="sigrika", name="西格莉卡团子", skill=SigrikaSkill()),
         ],
         starting_state=starting_state,
     )
