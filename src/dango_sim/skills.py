@@ -350,3 +350,22 @@ class DeniaSkill:
             result = roll + self.bonus
         self.last_roll = roll
         return result
+
+
+@dataclass
+class SigrikaSkill:
+    max_targets: int = 2
+    penalty: int = 1
+
+    def on_round_start(self, dango, state, engine, rng) -> None:
+        rankings = engine.rankings()
+        if dango.id not in rankings:
+            return
+        my_index = rankings.index(dango.id)
+        targets = []
+        for i in range(my_index - 1, max(my_index - self.max_targets - 1, -1), -1):
+            targets.append(rankings[i])
+        for target_id in targets[:self.max_targets]:
+            engine.round_penalties[target_id] = (
+                engine.round_penalties.get(target_id, 0) + self.penalty
+            )

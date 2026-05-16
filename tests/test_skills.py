@@ -18,6 +18,7 @@ from dango_sim.skills import (
     PhrolovaSkill,
     ChisaSkill,
     ShorekeeperSkill,
+    SigrikaSkill,
 )
 from dango_sim.tiles import Booster, Inhibitor, SpaceTimeRift
 
@@ -1335,3 +1336,81 @@ def test_denia_consecutive_matches_trigger_each_time():
 
     assert second_result == 4
     assert third_result == 4
+
+
+def test_sigrika_marks_two_neighbors_above():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="first", name="First"),
+            Dango(id="second", name="Second"),
+            Dango(id="sigrika", name="Sigrika", skill=SigrikaSkill()),
+            Dango(id="fourth", name="Fourth"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={8: ["first"], 6: ["second"], 4: ["sigrika"], 2: ["fourth"]})
+
+    engine.start_round(1)
+
+    assert engine.round_penalties.get("first") == 1
+    assert engine.round_penalties.get("second") == 1
+    assert "fourth" not in engine.round_penalties
+
+
+def test_sigrika_ranked_first_marks_nobody():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="sigrika", name="Sigrika", skill=SigrikaSkill()),
+            Dango(id="other", name="Other"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={8: ["sigrika"], 4: ["other"]})
+
+    engine.start_round(1)
+
+    assert engine.round_penalties == {}
+
+
+def test_sigrika_ranked_second_marks_only_one():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="first", name="First"),
+            Dango(id="sigrika", name="Sigrika", skill=SigrikaSkill()),
+            Dango(id="third", name="Third"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={8: ["first"], 6: ["sigrika"], 2: ["third"]})
+
+    engine.start_round(1)
+
+    assert engine.round_penalties.get("first") == 1
+    assert "third" not in engine.round_penalties
+
+
+def test_sigrika_penalties_reset_each_round():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="first", name="First"),
+            Dango(id="sigrika", name="Sigrika", skill=SigrikaSkill()),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng())
+    engine.state = RaceState(positions={8: ["first"], 4: ["sigrika"]})
+
+    engine.start_round(1)
+    assert engine.round_penalties.get("first") == 1
+
+    engine.state = RaceState(positions={8: ["sigrika"], 4: ["first"]})
+    engine._rankings_cache = None
+    engine.start_round(2)
+    assert engine.round_penalties == {}
