@@ -7,6 +7,7 @@ from dango_sim.skills import (
     CarlottaSkill,
     CartethyiaSkill,
     ChangliSkill,
+    DeniaSkill,
     HiyukiSkill,
     IunoSkill,
     JinhsiSkill,
@@ -1272,3 +1273,65 @@ def test_cartethyia_excludes_bu_king_from_ranking():
     )
 
     assert engine.dangos["cartethyia"].skill.triggered is True
+
+
+def test_denia_first_roll_never_triggers():
+    skill = DeniaSkill()
+    context = TurnContext(round_rolls={"d": 2}, base_roll=2, movement=2)
+
+    movement = skill.modify_roll(
+        Dango(id="d", name="Denia"),
+        2,
+        RaceState.initial(["d"]),
+        context,
+        FixedRng(),
+    )
+
+    assert movement == 2
+    assert skill.last_roll == 2
+
+
+def test_denia_matching_previous_roll_gives_bonus():
+    skill = DeniaSkill()
+    dango = Dango(id="d", name="Denia")
+    state = RaceState.initial(["d"])
+
+    skill.modify_roll(dango, 2, state, TurnContext(round_rolls={"d": 2}, base_roll=2, movement=2), FixedRng())
+
+    context = TurnContext(round_rolls={"d": 2}, base_roll=2, movement=2)
+    movement = skill.modify_roll(dango, 2, state, context, FixedRng())
+
+    assert movement == 4
+    assert skill.last_roll == 2
+
+
+def test_denia_non_matching_roll_gives_no_bonus():
+    skill = DeniaSkill()
+    dango = Dango(id="d", name="Denia")
+    state = RaceState.initial(["d"])
+
+    skill.modify_roll(dango, 3, state, TurnContext(round_rolls={"d": 3}, base_roll=3, movement=3), FixedRng())
+
+    context = TurnContext(round_rolls={"d": 2}, base_roll=2, movement=2)
+    movement = skill.modify_roll(dango, 2, state, context, FixedRng())
+
+    assert movement == 2
+    assert skill.last_roll == 2
+
+
+def test_denia_consecutive_matches_trigger_each_time():
+    skill = DeniaSkill()
+    dango = Dango(id="d", name="Denia")
+    state = RaceState.initial(["d"])
+
+    first = TurnContext(round_rolls={"d": 2}, base_roll=2, movement=2)
+    skill.modify_roll(dango, 2, state, first, FixedRng())
+
+    second = TurnContext(round_rolls={"d": 2}, base_roll=2, movement=2)
+    second_result = skill.modify_roll(dango, 2, state, second, FixedRng())
+
+    third = TurnContext(round_rolls={"d": 2}, base_roll=2, movement=2)
+    third_result = skill.modify_roll(dango, 2, state, third, FixedRng())
+
+    assert second_result == 4
+    assert third_result == 4

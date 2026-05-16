@@ -337,3 +337,16 @@ class CartethyiaSkill:
     def before_move(self, dango: Dango, state: RaceState, context, rng) -> None:
         if self.triggered and rng.random() < self.chance:
             context.movement += self.bonus
+
+
+@dataclass
+class DeniaSkill:
+    last_roll: int | None = None
+    bonus: int = 2
+
+    def modify_roll(self, dango, roll, state, context, rng) -> int:
+        result = roll
+        if self.last_roll is not None and self.last_roll == roll:
+            result = roll + self.bonus
+        self.last_roll = roll
+        return result
