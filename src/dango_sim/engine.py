@@ -142,7 +142,7 @@ class RaceEngine:
             if dango_id in normal_ids
         ]
         if stack:
-            self.state.place_group(stack, 0)
+            self.state.place_group(stack, 1)
             for dango_id in stack:
                 self.state.laps_completed.setdefault(dango_id, 0)
         self.opening_stack_applied = True
@@ -203,47 +203,9 @@ class RaceEngine:
                 "_round_order_actors",
                 self.actors_for_round(round_number),
             )
-        return self.apply_forced_last(
-            self.order_actors(
-                self.roll_order_values(
-                    actors,
-                    round_number=round_number,
-                )
-            )
-        )
-
-    def roll_order_values(
-        self,
-        actors: Iterable[str],
-        *,
-        round_number: int,
-    ) -> dict[str, int]:
-        return {
-            actor_id: self.roll_bu_king_order()
-            if actor_id == BU_KING_ID
-            else self.roll_for_order(actor_id)
-            for actor_id in actors
-        }
-
-    def order_actors(self, order_rolls: dict[str, int]) -> list[str]:
-        reverse = self.config.order_direction == "high_first"
-        ordered: list[str] = []
-        for roll in sorted(set(order_rolls.values()), reverse=reverse):
-            group = [
-                actor_id
-                for actor_id, value in order_rolls.items()
-                if value == roll
-            ]
-            self.rng.shuffle(group)
-            ordered.extend(group)
-        return ordered
-
-    def roll_bu_king_order(self) -> int:
-        faces = [1, 2, 3] if self.config.bu_king_order_faces == "d3" else [1, 2, 3, 4, 5, 6]
-        return int(self.rng.choice(faces))
-
-    def roll_for_order(self, dango_id: str) -> int:
-        return self.roll_with_dice_skill(dango_id)
+        shuffled = list(actors)
+        self.rng.shuffle(shuffled)
+        return self.apply_forced_last(shuffled)
 
     def roll_for_movement(self, dango_id: str) -> int:
         return self.roll_with_dice_skill(dango_id)

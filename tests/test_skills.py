@@ -436,19 +436,6 @@ def test_aemeath_consumes_skill_on_fail_when_configured():
     assert engine_skill.waiting is False
 
 
-def test_mornye_rolls_once_for_order_and_once_for_movement():
-    skill = MornyeSkill()
-    config = RaceConfig(
-        board=Board(finish=20),
-        participants=[Dango(id="m", name="Mornye", skill=skill)],
-        include_bu_king=False,
-    )
-    engine = RaceEngine(config)
-
-    assert engine.roll_for_order("m") == 3
-    assert engine.roll_for_movement("m") == 2
-
-
 def test_chisa_uses_base_movement_roll_pool_before_modifiers():
     skill = ChisaSkill()
     config = RaceConfig(
@@ -760,7 +747,7 @@ def test_run_loop_skips_dango_marked_to_skip_this_round():
     assert "skipped" not in engine.state.finished_group
 
 
-def test_run_loop_only_rolls_skipped_stateful_skill_for_opening_order():
+def test_shuffle_order_does_not_roll_for_skipped_skill():
     skill = StatefulSkipRoundStartSkill()
     config = RaceConfig(
         board=Board(finish=1),
@@ -770,12 +757,11 @@ def test_run_loop_only_rolls_skipped_stateful_skill_for_opening_order():
         ],
         include_bu_king=False,
     )
-    engine = RaceEngine(config, rng=FixedRng(choices=[1, 1]))
-
+    engine = RaceEngine(config, rng=FixedRng(choices=[1]))
     result = engine.run()
 
     assert result.winner_id == "winner"
-    assert engine.dangos["skipped"].skill.index == 1
+    assert engine.dangos["skipped"].skill.index == 0
 
 
 def test_on_turn_start_can_skip_before_movement():

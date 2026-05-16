@@ -36,14 +36,6 @@ class RecordingRollsSkill:
         return movement
 
 
-class RecordingRoundStartSkill:
-    def __init__(self):
-        self.observed_stacks = []
-
-    def on_round_start(self, dango, state, engine, rng):
-        self.observed_stacks.append(state.stack_at(0))
-
-
 class RecordingOrderSkill:
     def __init__(self, value):
         self.value = value
@@ -226,7 +218,7 @@ def test_round_rolls_are_materialized_before_first_turn():
         ],
         include_bu_king=False,
     )
-    engine = RaceEngine(config, rng=FixedRng([1, 1, 1, 1, 2, 3]))
+    engine = RaceEngine(config, rng=FixedRng([1, 2, 3]))
 
     engine.run()
 
@@ -838,7 +830,7 @@ class QueueRng:
         return 0.99
 
 
-def test_round_order_uses_high_first_order_rolls_and_shuffles_ties():
+def test_round_order_uses_random_shuffle():
     config = RaceConfig(
         board=Board(finish=20),
         participants=[
@@ -848,98 +840,69 @@ def test_round_order_uses_high_first_order_rolls_and_shuffles_ties():
         ],
         include_bu_king=False,
     )
-    engine = RaceEngine(config, rng=QueueRng([3, 1, 3], shuffles=[["c", "a"]]))
+    engine = RaceEngine(config, rng=QueueRng([1, 1, 1], shuffles=[["c", "a", "b"]]))
 
-    order_rolls = engine.roll_order_values(["a", "b", "c"], round_number=1)
-    order = engine.order_actors(order_rolls)
+    order = engine.build_round_order(1)
 
-    assert order_rolls == {"a": 3, "b": 1, "c": 3}
     assert order == ["c", "a", "b"]
 
 
-def test_round_order_can_use_low_first_order_rolls():
-    config = RaceConfig(
-        board=Board(finish=20),
-        participants=[Dango(id="a", name="A"), Dango(id="b", name="B")],
-        include_bu_king=False,
-        order_direction="low_first",
-    )
-    engine = RaceEngine(config, rng=QueueRng([3, 1]))
-
-    order = engine.order_actors(engine.roll_order_values(["a", "b"], round_number=1))
-
-    assert order == ["b", "a"]
-
-
-def test_no_starting_state_opening_stack_uses_first_round_order_before_round_start():
-    probe = RecordingRoundStartSkill()
+def test_no_starting_state_opening_stack_uses_shuffled_order():
     config = RaceConfig(
         board=Board(finish=20),
         participants=[
-            Dango(id="first", name="First", skill=RecordingOrderSkill(3)),
-            Dango(id="middle", name="Middle", skill=RecordingOrderSkill(2)),
-            Dango(id="last", name="Last", skill=probe),
+            Dango(id="first", name="First"),
+            Dango(id="second", name="Second"),
+            Dango(id="third", name="Third"),
         ],
         include_bu_king=False,
     )
-    engine = RaceEngine(config, rng=FixedRng([1, 1, 1]))
-
+    engine = RaceEngine(config, rng=QueueRng([1, 1, 1], shuffles=[["first", "second", "third"]]))
     engine.state.round_number = 1
     order = engine.prepare_round(1)
 
-    assert order == ["first", "middle", "last"]
-    assert engine.state.stack_at(0) == ["last", "middle", "first"]
-    assert engine.dangos["last"].skill.observed_stacks == [["last", "middle", "first"]]
+    assert order == ["first", "second", "third"]
+    assert engine.state.stack_at(1) == ["third", "second", "first"]
 
 
-def test_opening_stack_reuses_first_round_order_rolls_for_actual_turn_order():
-    first_skill = RecordingOrderSkill(3)
-    second_skill = RecordingOrderSkill(1)
+def test_opening_stack_reuses_first_round_shuffle_order():
     config = RaceConfig(
         board=Board(finish=20),
         participants=[
-            Dango(id="first", name="First", skill=first_skill),
-            Dango(id="second", name="Second", skill=second_skill),
+            Dango(id="first", name="First"),
+            Dango(id="second", name="Second"),
         ],
         include_bu_king=False,
     )
-    engine = RaceEngine(config, rng=FixedRng([1, 1]))
-
+    engine = RaceEngine(config, rng=QueueRng([1, 1], shuffles=[["first", "second"]]))
     engine.state.round_number = 1
     order = engine.prepare_round(1)
 
     assert order == ["first", "second"]
     assert engine.build_round_order(1) == ["first", "second"]
-    assert engine.dangos["first"].skill.rolls == 1
-    assert engine.dangos["second"].skill.rolls == 1
 
 
 def test_opening_stack_cached_first_round_order_applies_preexisting_forced_last():
-    forced_skill = RecordingOrderSkill(3)
-    other_skill = RecordingOrderSkill(1)
     config = RaceConfig(
         board=Board(finish=20),
         participants=[
-            Dango(id="forced", name="Forced", skill=forced_skill),
-            Dango(id="other", name="Other", skill=other_skill),
+            Dango(id="forced", name="Forced"),
+            Dango(id="other", name="Other"),
         ],
         include_bu_king=False,
     )
-    engine = RaceEngine(config, rng=FixedRng([1, 1]))
+    engine = RaceEngine(config, rng=QueueRng([1, 1], shuffles=[["forced", "other"]]))
     engine.force_last_next_round("forced")
-
     engine.state.round_number = 1
     order = engine.prepare_round(1)
 
     assert order == ["other", "forced"]
     assert engine.build_round_order(1) == ["other", "forced"]
-    assert engine.dangos["forced"].skill.rolls == 1
-    assert engine.dangos["other"].skill.rolls == 1
 
 
 def test_opening_stack_can_trigger_phrolova_round_start_bonus():
     config = RaceConfig(
-        board=Board(finish=4),
+        board=Board(finish=5),
         participants=[
             Dango(id="top", name="Top", skill=RecordingOrderSkill(3)),
             Dango(id="phrolova", name="Phrolova", skill=PhrolovaSkill()),
@@ -1155,30 +1118,12 @@ def test_bu_king_in_starting_state_does_not_roll_before_round_three():
             laps_completed={"a": 1},
         ),
     )
-    engine = RaceEngine(config, rng=QueueRng([3, 2]))
+    engine = RaceEngine(config, rng=QueueRng([2]))
 
     actors = engine.actors_for_round(1)
-    order_rolls = engine.roll_order_values(actors, round_number=1)
     move_rolls = engine.roll_round_values(actors)
 
     assert actors == ["a"]
-    assert order_rolls == {"a": 3}
     assert move_rolls == {"a": 2}
     assert engine.state.position_of(BU_KING_ID) == 5
 
-
-def test_bu_king_uses_configurable_order_faces_and_fixed_movement_faces_from_round_three():
-    config = RaceConfig(
-        board=Board(finish=10),
-        participants=[Dango(id="a", name="A")],
-        bu_king_order_faces="d6",
-    )
-    engine = RaceEngine(config, rng=QueueRng([2, 6, 1, 5]))
-
-    actors = engine.actors_for_round(3)
-    order_rolls = engine.roll_order_values(actors, round_number=3)
-    move_rolls = engine.roll_round_values(actors)
-
-    assert actors == ["a", BU_KING_ID]
-    assert order_rolls[BU_KING_ID] == 6
-    assert move_rolls[BU_KING_ID] == 5
