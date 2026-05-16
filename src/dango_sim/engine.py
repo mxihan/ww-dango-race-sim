@@ -35,6 +35,7 @@ class RaceEngine:
         self.force_last_this_round_ids: set[str] = set()
         self.opening_stack_applied = self.config.starting_state is not None
         self._cached_round_orders: dict[int, list[str]] = {}
+        self.round_penalties: dict[str, int] = {}
         if self.config.starting_state is None:
             self.state = RaceState.empty(self.normal_ids())
         else:
@@ -155,6 +156,7 @@ class RaceEngine:
         ]
 
     def start_round(self, round_number: int) -> None:
+        self.round_penalties.clear()
         self.force_last_this_round_ids = set(self.force_last_next_round_ids)
         self.force_last_next_round_ids.clear()
         self.skip_turns_this_round.clear()
@@ -287,6 +289,9 @@ class RaceEngine:
         if dango.skill and hasattr(dango.skill, "before_move"):
             dango.skill.before_move(dango, self.state, context, self.rng)
             self._emit("skill", dango_id=dango_id, hook_name="before_move", state=self.state)
+        penalty = self.round_penalties.get(dango_id, 0)
+        if penalty:
+            context.movement = max(1, context.movement - penalty)
         if context.blocked or context.movement <= 0:
             return
 

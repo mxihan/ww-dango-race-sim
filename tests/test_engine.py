@@ -1127,3 +1127,57 @@ def test_bu_king_in_starting_state_does_not_roll_before_round_three():
     assert move_rolls == {"a": 2}
     assert engine.state.position_of(BU_KING_ID) == 5
 
+
+def test_round_penalties_reduce_movement_with_floor_of_one():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="a", name="A"),
+            Dango(id="b", name="B"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([3, 1]))
+    engine.state = RaceState(positions={0: ["a", "b"]})
+
+    engine.start_round(1)
+    engine.round_penalties["a"] = 1
+
+    engine.take_turn("a", base_roll=3, round_rolls={"a": 3, "b": 1})
+
+    assert engine.state.position_of("a") == 2
+
+
+def test_round_penalties_do_not_reduce_movement_below_one():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[
+            Dango(id="a", name="A"),
+            Dango(id="b", name="B"),
+        ],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([1, 1]))
+    engine.state = RaceState(positions={0: ["a", "b"]})
+
+    engine.start_round(1)
+    engine.round_penalties["a"] = 5
+
+    engine.take_turn("a", base_roll=1, round_rolls={"a": 1, "b": 1})
+
+    assert engine.state.position_of("a") == 1
+
+
+def test_round_penalties_clear_at_round_start():
+    config = RaceConfig(
+        board=Board(finish=20),
+        participants=[Dango(id="a", name="A")],
+        include_bu_king=False,
+    )
+    engine = RaceEngine(config, rng=FixedRng([]))
+    engine.round_penalties["a"] = 3
+
+    engine.start_round(1)
+
+    assert engine.round_penalties == {}
+
